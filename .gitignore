@@ -1,0 +1,27 @@
+# Godot local/editor generated files
+.godot/
+.import/
+*.translation
+
+# Godot exports and build outputs
+export/
+exports/
+build/
+builds/
+dist/
+*.pck
+*.zip
+
+# Local Godot editor binaries kept beside the project
+Godot_*.exe
+Godot_*_console.exe
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+*.log
+
+# Office temporary lock files
+~$*
