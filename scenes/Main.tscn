@@ -1,0 +1,106 @@
+[gd_scene format=3 uid="uid://da116vfr3ykqp"]
+
+[ext_resource type="Script" uid="uid://bc8cbcm0hlnss" path="res://scripts/BoardManager.gd" id="1_board"]
+[ext_resource type="Script" uid="uid://c4m0cjauxxy2w" path="res://scripts/MoveValidator.gd" id="2_move"]
+[ext_resource type="Script" uid="uid://bt1yghj8vcyd8" path="res://scripts/GameManager.gd" id="3_game"]
+[ext_resource type="Script" uid="uid://7ob743vedaqi" path="res://scripts/GameUI.gd" id="4_ui"]
+[ext_resource type="Script" uid="uid://b33y2oui8u5w3" path="res://scripts/FocusCamera.gd" id="5_focus"]
+[ext_resource type="Script" uid="uid://j5ibd8fdpprn" path="res://scripts/AIPlayer.gd" id="6_ai"]
+[ext_resource type="Script" uid="uid://blo565qmv4euu" path="res://scripts/NetworkManager.gd" id="7_network"]
+[ext_resource type="Script" uid="uid://xrg0lxv07e0e" path="res://scripts/BackgroundManager.gd" id="8_background"]
+[ext_resource type="Script" uid="uid://isl6ailoexs" path="res://scripts/ViewFocusMarkerManager.gd" id="9_view_markers"]
+[ext_resource type="Script" path="res://scripts/PassiveSkillRuleEngine.gd" id="10_skill_rules"]
+[ext_resource type="Script" path="res://scripts/AudioManager.gd" id="11_audio"]
+
+[node name="Main" type="Node3D" unique_id=1364296545]
+
+[node name="BackgroundManager" type="Node3D" parent="." unique_id=636421147]
+script = ExtResource("8_background")
+
+[node name="BoardManager" type="Node3D" parent="." unique_id=336027821]
+script = ExtResource("1_board")
+
+[node name="ViewFocusMarkerManager" type="Node3D" parent="." unique_id=1984693404]
+script = ExtResource("9_view_markers")
+
+[node name="MoveValidator" type="Node" parent="." unique_id=2075577313]
+script = ExtResource("2_move")
+
+[node name="PassiveSkillRuleEngine" type="Node" parent="."]
+script = ExtResource("10_skill_rules")
+
+[node name="AudioManager" type="Node" parent="."]
+script = ExtResource("11_audio")
+
+[node name="NetworkManager" type="Node" parent="." unique_id=1570333302]
+script = ExtResource("7_network")
+
+[node name="GameManager" type="Node" parent="." unique_id=81933986]
+script = ExtResource("3_game")
+
+[node name="AIPlayer" type="Node" parent="." unique_id=1827492433]
+script = ExtResource("6_ai")
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=1515474400]
+transform = Transform3D(1, 0, 0, 0, 0.573576, 0.819152, 0, -0.819152, 0.573576, 0, 12, 13)
+current = true
+fov = 45.0
+script = ExtResource("5_focus")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=2003419750]
+transform = Transform3D(0.707107, -0.353553, 0.612372, 0, 0.866025, 0.5, -0.707107, -0.353553, 0.612372, 0, 8, 0)
+light_color = Color(1, 0.92, 0.82, 1)
+light_energy = 0.0
+
+[node name="GameUI" type="CanvasLayer" parent="." unique_id=1388499109]
+script = ExtResource("4_ui")
+
+[node name="MarginContainer" type="MarginContainer" parent="GameUI" unique_id=182665828]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = -16.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="GameUI/MarginContainer" unique_id=1358032940]
+layout_mode = 2
+
+[node name="CurrentPlayerLabel" type="Label" parent="GameUI/MarginContainer/VBoxContainer" unique_id=367103342]
+layout_mode = 2
+text = "当前玩家：玩家 1"
+
+[node name="TurnPromptLabel" type="Label" parent="GameUI/MarginContainer/VBoxContainer" unique_id=2112522382]
+layout_mode = 2
+text = "轮到你操作"
+
+[node name="EndTurnButton" type="Button" parent="GameUI/MarginContainer/VBoxContainer" unique_id=1166541542]
+visible = false
+layout_mode = 2
+text = "结束回合"
+
+[node name="TestLayoutButton" type="Button" parent="GameUI/MarginContainer/VBoxContainer" unique_id=1999589257]
+layout_mode = 2
+text = "测试布局"
+
+[node name="RestartButton" type="Button" parent="GameUI/MarginContainer/VBoxContainer" unique_id=1532509915]
+layout_mode = 2
+text = "重新开始"
+
+[node name="VictoryPanel" type="PanelContainer" parent="GameUI/MarginContainer" unique_id=1134287392]
+visible = false
+layout_mode = 2
+
+[node name="VictoryBox" type="VBoxContainer" parent="GameUI/MarginContainer/VictoryPanel" unique_id=2144610165]
+layout_mode = 2
+alignment = 1
+
+[node name="VictoryLabel" type="Label" parent="GameUI/MarginContainer/VictoryPanel/VictoryBox" unique_id=1530539599]
+layout_mode = 2
+text = "玩家 1 获胜"
+horizontal_alignment = 1
+
+[node name="PlayAgainButton" type="Button" parent="GameUI/MarginContainer/VictoryPanel/VictoryBox" unique_id=182694972]
+layout_mode = 2
+text = "再来一局"

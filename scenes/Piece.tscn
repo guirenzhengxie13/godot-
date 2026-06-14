@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://piece_scene"]
+
+[ext_resource type="Script" path="res://scripts/Piece.gd" id="1_piece"]
+
+[node name="Piece" type="Area3D"]
+script = ExtResource("1_piece")

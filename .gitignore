@@ -1,0 +1,15 @@
+# Godot generated/import cache
+.godot/
+.import/
+
+# Godot local/export artifacts
+export.cfg
+export_presets.cfg
+*.tmp
+*.log
+
+# OS/editor noise
+desktop.ini
+Thumbs.db
+.DS_Store
+.vscode/

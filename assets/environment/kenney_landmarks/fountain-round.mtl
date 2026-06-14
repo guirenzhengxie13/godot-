@@ -1,0 +1,8 @@
+# Created by Kenney (www.kenney.nl)
+
+newmtl colormap
+Kd 1 1 1
+
+newmtl Water
+Kd 0.476415 0.86381 1
+

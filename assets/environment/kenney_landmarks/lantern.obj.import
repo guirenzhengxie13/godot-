@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://do2076yy0r5a1"
+path="res://.godot/imported/lantern.obj-881dd8a192240ed28a54e347a269109e.mesh"
+
+[deps]
+
+files=["res://.godot/imported/lantern.obj-881dd8a192240ed28a54e347a269109e.mesh"]
+
+source_file="res://assets/environment/kenney_landmarks/lantern.obj"
+dest_files=["res://.godot/imported/lantern.obj-881dd8a192240ed28a54e347a269109e.mesh", "res://.godot/imported/lantern.obj-881dd8a192240ed28a54e347a269109e.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

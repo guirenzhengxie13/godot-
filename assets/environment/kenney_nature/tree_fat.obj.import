@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://uygffambra2t"
+path="res://.godot/imported/tree_fat.obj-21808a62fc83549264cc24f6f4bc96ee.mesh"
+
+[deps]
+
+files=["res://.godot/imported/tree_fat.obj-21808a62fc83549264cc24f6f4bc96ee.mesh"]
+
+source_file="res://assets/environment/kenney_nature/tree_fat.obj"
+dest_files=["res://.godot/imported/tree_fat.obj-21808a62fc83549264cc24f6f4bc96ee.mesh", "res://.godot/imported/tree_fat.obj-21808a62fc83549264cc24f6f4bc96ee.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false
