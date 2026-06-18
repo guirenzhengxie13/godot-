@@ -24,6 +24,9 @@ signal restart_with_seed_requested(seed_text: String)
 signal analysis_mode_toggled(enabled: bool)
 signal material_selected(target: String, material_id: String)
 signal lighting_preset_selected(preset_id: String)
+signal render_cost_profile_selected(profile_id: String)
+signal time_of_day_selected(hour: float)
+signal auto_time_cycle_toggled(enabled: bool)
 signal lighting_value_changed(parameter: String, value: float)
 signal save_lighting_requested
 signal reset_lighting_requested
@@ -86,6 +89,13 @@ var _player_one_material_option: OptionButton
 var _player_two_material_option: OptionButton
 var _lighting_preset_options: Array[Dictionary] = []
 var _lighting_preset_option: OptionButton
+var _render_cost_profile_options: Array[Dictionary] = []
+var _render_cost_profile_option: OptionButton
+var _render_cost_profile_summary_label: Label
+var _time_of_day_options: Array[Dictionary] = []
+var _time_of_day_button_row: HBoxContainer
+var _auto_time_cycle_checkbox: CheckBox
+var _auto_time_cycle_syncing := false
 var _lighting_sliders: Dictionary = {}
 var _lighting_value_labels: Dictionary = {}
 var _lighting_status_label: Label
@@ -296,9 +306,34 @@ func set_lighting_presets(options: Array[Dictionary]) -> void:
 	_populate_lighting_preset_option()
 
 
+func set_render_cost_profiles(options: Array[Dictionary]) -> void:
+	_render_cost_profile_options = options.duplicate(true)
+	_populate_render_cost_profile_option()
+
+
+func set_render_cost_profile(profile: Dictionary) -> void:
+	_lighting_controls_syncing = true
+	_select_render_cost_profile(String(profile.get("id", "high")))
+	_update_render_cost_profile_summary(String(profile.get("summary", "")))
+	_lighting_controls_syncing = false
+
+
+func set_time_of_day_presets(options: Array[Dictionary]) -> void:
+	_time_of_day_options = options.duplicate(true)
+	_populate_time_of_day_buttons()
+
+
+func set_auto_time_cycle_enabled(enabled: bool) -> void:
+	_auto_time_cycle_syncing = true
+	if _auto_time_cycle_checkbox != null:
+		_auto_time_cycle_checkbox.button_pressed = enabled
+	_auto_time_cycle_syncing = false
+
+
 func set_lighting_settings(settings: Dictionary) -> void:
 	_lighting_controls_syncing = true
 	_select_lighting_preset(String(settings.get("preset_id", "custom")))
+	_select_render_cost_profile(String(settings.get("render_cost_profile_id", "high")))
 	for parameter in _lighting_sliders.keys():
 		var slider: HSlider = _lighting_sliders[parameter]
 		slider.value = float(settings.get(parameter, slider.value))
@@ -785,7 +820,7 @@ func _build_pause_menu() -> void:
 func _build_lighting_menu() -> void:
 	_lighting_menu = _build_overlay_root("LightingMenu")
 	_lighting_menu.visible = false
-	var panel := _build_menu_panel(Vector2(500.0, 670.0))
+	var panel := _build_menu_panel(Vector2(520.0, 735.0))
 	_lighting_menu.add_child(panel)
 	var box := _build_menu_box(panel)
 
@@ -812,6 +847,39 @@ func _build_lighting_menu() -> void:
 	_lighting_preset_option.item_selected.connect(_on_lighting_preset_option_selected)
 	preset_row.add_child(_lighting_preset_option)
 	_populate_lighting_preset_option()
+
+	var render_cost_row := HBoxContainer.new()
+	render_cost_row.add_theme_constant_override("separation", 8)
+	box.add_child(render_cost_row)
+	var render_cost_label := Label.new()
+	render_cost_label.text = "渲染开销"
+	render_cost_label.custom_minimum_size = Vector2(116.0, 0.0)
+	render_cost_row.add_child(render_cost_label)
+	_render_cost_profile_option = OptionButton.new()
+	_render_cost_profile_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_render_cost_profile_option.item_selected.connect(_on_render_cost_profile_option_selected)
+	render_cost_row.add_child(_render_cost_profile_option)
+	_populate_render_cost_profile_option()
+
+	_render_cost_profile_summary_label = Label.new()
+	_render_cost_profile_summary_label.text = ""
+	_render_cost_profile_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_render_cost_profile_summary_label.add_theme_color_override("font_color", Color(0.72, 0.8, 0.74))
+	box.add_child(_render_cost_profile_summary_label)
+
+	var time_title := Label.new()
+	time_title.text = "时间光照"
+	box.add_child(time_title)
+
+	_time_of_day_button_row = HBoxContainer.new()
+	_time_of_day_button_row.add_theme_constant_override("separation", 6)
+	box.add_child(_time_of_day_button_row)
+	_populate_time_of_day_buttons()
+
+	_auto_time_cycle_checkbox = CheckBox.new()
+	_auto_time_cycle_checkbox.text = "自动昼夜"
+	_auto_time_cycle_checkbox.toggled.connect(_on_auto_time_cycle_checkbox_toggled)
+	box.add_child(_auto_time_cycle_checkbox)
 
 	_build_lighting_slider(box, "环境光", "ambient_energy", 0.2, 1.2, 0.01)
 	_build_lighting_slider(box, "主光", "sun_energy", 0.0, 0.6, 0.01)
@@ -878,6 +946,30 @@ func _populate_lighting_preset_option() -> void:
 		_lighting_preset_option.set_item_metadata(_lighting_preset_option.item_count - 1, String(option.get("id", "custom")))
 
 
+func _populate_render_cost_profile_option() -> void:
+	if _render_cost_profile_option == null:
+		return
+	_render_cost_profile_option.clear()
+	for option in _render_cost_profile_options:
+		_render_cost_profile_option.add_item(String(option.get("label", "开销档位")))
+		_render_cost_profile_option.set_item_metadata(_render_cost_profile_option.item_count - 1, String(option.get("id", "high")))
+
+
+func _populate_time_of_day_buttons() -> void:
+	if _time_of_day_button_row == null:
+		return
+	for child in _time_of_day_button_row.get_children():
+		child.queue_free()
+	for option in _time_of_day_options:
+		var button := Button.new()
+		button.text = String(option.get("label", "时间"))
+		button.custom_minimum_size = Vector2(64.0, 36.0)
+		var hour := float(option.get("hour", 12.0))
+		button.pressed.connect(_on_time_of_day_button_pressed.bind(hour))
+		_time_of_day_button_row.add_child(button)
+		_style_button(button)
+
+
 func _select_lighting_preset(preset_id: String) -> void:
 	if _lighting_preset_option == null:
 		return
@@ -885,6 +977,28 @@ func _select_lighting_preset(preset_id: String) -> void:
 		if String(_lighting_preset_option.get_item_metadata(index)) == preset_id:
 			_lighting_preset_option.select(index)
 			return
+
+
+func _select_render_cost_profile(profile_id: String) -> void:
+	if _render_cost_profile_option == null:
+		return
+	for index in range(_render_cost_profile_option.item_count):
+		if String(_render_cost_profile_option.get_item_metadata(index)) == profile_id:
+			_render_cost_profile_option.select(index)
+			_update_render_cost_profile_summary_by_id(profile_id)
+			return
+
+
+func _update_render_cost_profile_summary_by_id(profile_id: String) -> void:
+	for option in _render_cost_profile_options:
+		if String(option.get("id", "high")) == profile_id:
+			_update_render_cost_profile_summary(String(option.get("summary", "")))
+			return
+
+
+func _update_render_cost_profile_summary(summary: String) -> void:
+	if _render_cost_profile_summary_label != null:
+		_render_cost_profile_summary_label.text = summary
 
 
 func _update_lighting_value_label(parameter: String, value: float) -> void:
@@ -1195,6 +1309,24 @@ func _on_lighting_preset_option_selected(index: int) -> void:
 	if _lighting_controls_syncing or _lighting_preset_option == null or index < 0:
 		return
 	lighting_preset_selected.emit(String(_lighting_preset_option.get_item_metadata(index)))
+
+
+func _on_render_cost_profile_option_selected(index: int) -> void:
+	if _lighting_controls_syncing or _render_cost_profile_option == null or index < 0:
+		return
+	var profile_id := String(_render_cost_profile_option.get_item_metadata(index))
+	_update_render_cost_profile_summary_by_id(profile_id)
+	render_cost_profile_selected.emit(profile_id)
+
+
+func _on_auto_time_cycle_checkbox_toggled(enabled: bool) -> void:
+	if _auto_time_cycle_syncing:
+		return
+	auto_time_cycle_toggled.emit(enabled)
+
+
+func _on_time_of_day_button_pressed(hour: float) -> void:
+	time_of_day_selected.emit(hour)
 
 
 func _on_lighting_slider_changed(parameter: String, value: float) -> void:

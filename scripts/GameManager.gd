@@ -7,8 +7,7 @@ signal piece_selected(piece)
 
 const MODE_LOCAL_VS_AI := "local_vs_ai"
 const MODE_ONLINE_PVP := "online_pvp"
-const MATCH_RECORD_DIR := "user://match_records"
-const LATEST_MATCH_RECORD_PATH := "user://match_records/latest_match.json"
+const MatchRecorderScript := preload("res://scripts/gameplay/MatchRecorder.gd")
 
 @export var board_manager_path: NodePath = ^"../BoardManager"
 @export var move_validator_path: NodePath = ^"../MoveValidator"
@@ -47,7 +46,7 @@ var online_is_host := false
 var game_mode := MODE_LOCAL_VS_AI
 var player_ai_takeover_enabled := false
 var _turn_token := 0
-var _match_record: Dictionary = {}
+var _match_recorder: Variant = MatchRecorderScript.new()
 var _replay_active := false
 var _replay_playing := false
 var _replay_step_index := 0
@@ -86,6 +85,9 @@ func _ready() -> void:
 	game_ui.analysis_mode_toggled.connect(_on_analysis_mode_toggled)
 	game_ui.material_selected.connect(_on_material_selected)
 	game_ui.lighting_preset_selected.connect(_on_lighting_preset_selected)
+	game_ui.render_cost_profile_selected.connect(_on_render_cost_profile_selected)
+	game_ui.time_of_day_selected.connect(_on_time_of_day_selected)
+	game_ui.auto_time_cycle_toggled.connect(_on_auto_time_cycle_toggled)
 	game_ui.lighting_value_changed.connect(_on_lighting_value_changed)
 	game_ui.save_lighting_requested.connect(_on_save_lighting_requested)
 	game_ui.reset_lighting_requested.connect(_on_reset_lighting_requested)
@@ -93,7 +95,12 @@ func _ready() -> void:
 	game_ui.set_material_selection(board_manager.get_material_selection())
 	if background_manager != null:
 		background_manager.lighting_settings_changed.connect(game_ui.set_lighting_settings)
+		background_manager.render_cost_profile_changed.connect(game_ui.set_render_cost_profile)
 		game_ui.set_lighting_presets(background_manager.get_lighting_presets())
+		game_ui.set_render_cost_profiles(background_manager.get_render_cost_profiles())
+		game_ui.set_render_cost_profile(background_manager.get_render_cost_profile())
+		game_ui.set_time_of_day_presets(background_manager.get_time_of_day_presets())
+		game_ui.set_auto_time_cycle_enabled(background_manager.auto_time_cycle_enabled)
 		game_ui.set_lighting_settings(background_manager.get_lighting_settings())
 	current_player_changed.connect(game_ui.set_current_player)
 	game_won.connect(game_ui.show_victory)
@@ -730,6 +737,33 @@ func _on_lighting_preset_selected(preset_id: String) -> void:
 	game_ui.show_lighting_status("已应用预设：%s" % preset_id)
 
 
+func _on_render_cost_profile_selected(profile_id: String) -> void:
+	if background_manager == null:
+		return
+	background_manager.apply_render_cost_profile(profile_id)
+	var profile: Dictionary = background_manager.get_render_cost_profile()
+	game_ui.set_render_cost_profile(profile)
+	game_ui.show_lighting_status("已应用 Forward+ 开销档位：%s" % String(profile.get("label", profile_id)))
+
+
+func _on_time_of_day_selected(hour: float) -> void:
+	if background_manager == null or not background_manager.has_method("set_time_of_day"):
+		return
+	background_manager.set_time_of_day(hour)
+	game_ui.show_lighting_status("已切换时间光照：%.1f 点" % hour)
+
+
+func _on_auto_time_cycle_toggled(enabled: bool) -> void:
+	if background_manager == null:
+		return
+	if background_manager.has_method("set_auto_time_cycle_enabled"):
+		background_manager.set_auto_time_cycle_enabled(enabled)
+	else:
+		background_manager.auto_time_cycle_enabled = enabled
+	game_ui.set_auto_time_cycle_enabled(enabled)
+	game_ui.show_lighting_status("自动昼夜：%s" % ("开启" if enabled else "关闭"))
+
+
 func _on_lighting_value_changed(parameter: String, value: float) -> void:
 	if background_manager != null:
 		background_manager.set_lighting_value(parameter, value)
@@ -747,7 +781,8 @@ func _on_reset_lighting_requested() -> void:
 	if background_manager == null:
 		return
 	background_manager.apply_lighting_preset("soft_day")
-	game_ui.show_lighting_status("已恢复柔和日光预设")
+	background_manager.apply_render_cost_profile("high")
+	game_ui.show_lighting_status("已恢复柔和日光预设与高渲染档")
 
 
 func _on_game_message_received(message: Dictionary) -> void:
@@ -1044,17 +1079,7 @@ func _perform_ai_turn(token: int) -> void:
 func _begin_match_record(layout_name: String) -> void:
 	if _replay_active:
 		return
-	_match_record = {
-		"version": 2,
-		"created_at": Time.get_datetime_string_from_system(false, true),
-		"mode": game_mode,
-		"layout": layout_name,
-		"players": player_count,
-		"random_seed": _match_seed,
-		"skills_enabled": _skills_enabled,
-		"initial_pieces": board_manager.get_pieces_snapshot(),
-		"entries": [],
-	}
+	_match_recorder.reset(layout_name, game_mode, player_count, _match_seed, _skills_enabled, board_manager.get_pieces_snapshot())
 	_update_recording_ui()
 
 
@@ -1074,7 +1099,7 @@ func _build_standard_action(from_coord: Vector2i, to_coord: Vector2i) -> Diction
 
 
 func _record_action(player_id: int, action: Dictionary, actor: String, turn_ended: bool, outcome := "") -> void:
-	if _replay_active or _match_record.is_empty():
+	if _replay_active or not _match_recorder.has_record():
 		return
 
 	var entry := _build_pending_action_entry(player_id, action, actor)
@@ -1085,7 +1110,7 @@ func _record_action(player_id: int, action: Dictionary, actor: String, turn_ende
 
 
 func _record_turn_end(player_id: int, actor: String) -> void:
-	if _replay_active or _match_record.is_empty():
+	if _replay_active or not _match_recorder.has_record():
 		return
 
 	_append_record_entry({
@@ -1097,78 +1122,55 @@ func _record_turn_end(player_id: int, actor: String) -> void:
 
 
 func _append_record_entry(entry: Dictionary) -> void:
-	var entries: Array = _get_record_entries()
-	entries.append(entry)
-	_match_record["entries"] = entries
+	_match_recorder.append_entry(entry)
 	_update_recording_ui()
 	_persist_match_record(false)
 
 
 func _mark_last_record_outcome(outcome: String) -> void:
-	var entries: Array = _get_record_entries()
-	if entries.is_empty():
-		return
-	var last_entry = entries[entries.size() - 1]
-	if last_entry is Dictionary:
-		last_entry["outcome"] = outcome
-		last_entry["turn_ended"] = true
-		entries[entries.size() - 1] = last_entry
-		_match_record["entries"] = entries
+	if _match_recorder.mark_last_outcome(outcome):
 		_update_recording_ui()
 		_persist_match_record(false)
 
 
 func _persist_match_record(show_status: bool) -> bool:
-	if _match_record.is_empty():
+	if not _match_recorder.has_record():
 		if show_status:
 			game_ui.set_match_record_status("没有可保存的对局记录")
 		return false
 
-	var user_dir := DirAccess.open("user://")
-	var dir_result := ERR_CANT_OPEN
-	if user_dir != null:
-		dir_result = user_dir.make_dir_recursive("match_records")
-	if dir_result != OK:
+	var save_result: int = _match_recorder.save_latest()
+	if save_result != OK:
 		if show_status:
-			game_ui.set_match_record_status("保存失败：无法创建记录目录 %d" % dir_result)
+			if String(_match_recorder.last_error_context) == "dir":
+				game_ui.set_match_record_status("保存失败：无法创建记录目录 %d" % save_result)
+			else:
+				game_ui.set_match_record_status("保存失败：%d" % save_result)
 		return false
 
-	var file := FileAccess.open(LATEST_MATCH_RECORD_PATH, FileAccess.WRITE)
-	if file == null:
-		if show_status:
-			game_ui.set_match_record_status("保存失败：%d" % FileAccess.get_open_error())
-		return false
-
-	file.store_string(JSON.stringify(_match_record, "\t"))
-	file.close()
 	if show_status:
 		game_ui.set_match_record_status("已保存最近记录：%d 步" % _get_record_entries().size())
 	return true
 
 
 func _load_latest_match_record() -> bool:
-	if not FileAccess.file_exists(LATEST_MATCH_RECORD_PATH):
+	var load_result: int = _match_recorder.load_latest()
+	if load_result == ERR_FILE_NOT_FOUND:
 		game_ui.set_match_record_status("没有找到最近记录")
 		return false
-
-	var file := FileAccess.open(LATEST_MATCH_RECORD_PATH, FileAccess.READ)
-	if file == null:
-		game_ui.set_match_record_status("读取失败：%d" % FileAccess.get_open_error())
-		return false
-
-	var parsed = JSON.parse_string(file.get_as_text())
-	file.close()
-	if not parsed is Dictionary:
+	if load_result == ERR_PARSE_ERROR:
 		game_ui.set_match_record_status("读取失败：记录 JSON 无效")
 		return false
-
-	_match_record = parsed
+	if load_result != OK:
+		game_ui.set_match_record_status("读取失败：%d" % load_result)
+		return false
 	_update_recording_ui()
 	return true
 
 
 func _start_replay() -> void:
-	if _match_record.is_empty() or not _match_record.has("initial_pieces"):
+	var record: Dictionary = _match_recorder.record
+	if record.is_empty() or not record.has("initial_pieces"):
 		game_ui.set_match_record_status("没有可回放的对局记录")
 		return
 
@@ -1201,15 +1203,16 @@ func _stop_replay() -> void:
 
 
 func _apply_replay_step(step_index: int) -> void:
-	if _match_record.is_empty():
+	var record: Dictionary = _match_recorder.record
+	if record.is_empty():
 		return
 
 	var entries := _get_record_entries()
 	_replay_step_index = clampi(step_index, 0, entries.size())
-	_match_seed = int(_match_record.get("random_seed", 0))
-	_set_skills_enabled(bool(_match_record.get("skills_enabled", false)))
+	_match_seed = int(record.get("random_seed", 0))
+	_set_skills_enabled(bool(record.get("skills_enabled", false)))
 	game_ui.set_skill_seed(_match_seed, _skills_enabled)
-	board_manager.load_pieces_snapshot(_match_record.get("initial_pieces", []))
+	board_manager.load_pieces_snapshot(record.get("initial_pieces", []))
 	board_manager.refresh_piece_skill_status(skill_rules)
 	board_manager.clear_highlights()
 
@@ -1254,9 +1257,7 @@ func _update_recording_ui() -> void:
 
 
 func _get_record_entries() -> Array:
-	if _match_record.has("entries") and _match_record["entries"] is Array:
-		return _match_record["entries"]
-	return []
+	return _match_recorder.get_entries()
 
 
 func _format_replay_entry_label(entry: Dictionary, step_index: int, total_steps: int) -> String:

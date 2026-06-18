@@ -2,6 +2,7 @@ class_name BackgroundManager
 extends Node3D
 
 signal lighting_settings_changed(settings: Dictionary)
+signal render_cost_profile_changed(profile: Dictionary)
 
 @export var hdri_path := ""
 @export var use_procedural_blue_sky := true
@@ -20,10 +21,237 @@ signal lighting_settings_changed(settings: Dictionary)
 @export var garden_ring_inner_radius := 6.65
 @export var garden_ring_outer_radius := 8.15
 @export var target_fps := 60
+@export var time_of_day := 12.0
+@export var auto_time_cycle_enabled := false
+@export var day_length_seconds := 240.0
+@export var time_transition_speed := 4.0
 
 const KENNEY_PROP_ROOT := "res://assets/environment/kenney_nature"
 const KENNEY_LANDMARK_ROOT := "res://assets/environment/kenney_landmarks"
 const LIGHTING_PROFILE_PATH := "user://lighting_profile.cfg"
+const RENDER_COST_PROFILE_CONFIG_PATH := "user://render_cost_profile.cfg"
+const DEFAULT_RENDER_COST_PROFILE_ID := "high"
+const RENDER_COST_PROFILE_ORDER := [
+	"high",
+	"medium",
+	"low",
+]
+const RENDER_COST_PROFILES := {
+	"high": {
+		"label": "高渲染",
+		"summary": "保留当前默认画面，作为 Forward+ 高画质基准。",
+		"render_scale": 1.2,
+		"msaa_level": 2.0,
+		"fxaa_enabled": 1.0,
+		"taa_enabled": 0.0,
+		"debanding_enabled": 1.0,
+		"ssao_intensity_multiplier": 1.0,
+		"fog_density_multiplier": 1.0,
+		"reflection_intensity_multiplier": 1.0,
+		"board_glow_energy_multiplier": 1.0,
+		"grass_density_multiplier": 1.0,
+		"ground_radial_segments": 128.0,
+	},
+	"medium": {
+		"label": "中渲染",
+		"summary": "推荐默认游玩档，降低采样与后期强度但保留棋盘边缘质量。",
+		"render_scale": 1.0,
+		"msaa_level": 2.0,
+		"fxaa_enabled": 1.0,
+		"taa_enabled": 0.0,
+		"debanding_enabled": 1.0,
+		"ssao_intensity_multiplier": 0.65,
+		"fog_density_multiplier": 0.85,
+		"reflection_intensity_multiplier": 0.75,
+		"board_glow_energy_multiplier": 0.65,
+		"grass_density_multiplier": 0.65,
+		"ground_radial_segments": 96.0,
+	},
+	"low": {
+		"label": "低渲染",
+		"summary": "低配电脑、调试和笔记本省电档，仍保持 Forward+。",
+		"render_scale": 0.85,
+		"msaa_level": 0.0,
+		"fxaa_enabled": 1.0,
+		"taa_enabled": 0.0,
+		"debanding_enabled": 0.0,
+		"ssao_intensity_multiplier": 0.25,
+		"fog_density_multiplier": 0.55,
+		"reflection_intensity_multiplier": 0.35,
+		"board_glow_energy_multiplier": 0.25,
+		"grass_density_multiplier": 0.35,
+		"ground_radial_segments": 64.0,
+	},
+}
+const LIGHT_BUDGETS := {
+	"high": {
+		"board_fill_count": 4,
+		"board_glow_real_light_count": 8,
+		"forest_rim_count": 6,
+		"mood_light_count": 8,
+		"garden_glow_real_light_count": 6,
+	},
+	"medium": {
+		"board_fill_count": 2,
+		"board_glow_real_light_count": 4,
+		"forest_rim_count": 3,
+		"mood_light_count": 4,
+		"garden_glow_real_light_count": 3,
+	},
+	"low": {
+		"board_fill_count": 1,
+		"board_glow_real_light_count": 0,
+		"forest_rim_count": 0,
+		"mood_light_count": 2,
+		"garden_glow_real_light_count": 0,
+	},
+}
+const TIME_OF_DAY_PRESETS := [
+	{"label": "日出", "hour": 5.5},
+	{"label": "上午", "hour": 9.0},
+	{"label": "正午", "hour": 12.5},
+	{"label": "黄昏", "hour": 17.5},
+	{"label": "夜晚", "hour": 21.0},
+]
+const TIME_OF_DAY_KEYFRAMES := [
+	{
+		"time": 0.0,
+		"label": "深夜",
+		"sun_energy": 0.0,
+		"ambient_energy": 0.28,
+		"fill_energy": 0.025,
+		"exposure": 0.82,
+		"fog_density": 0.010,
+		"fog_sky_affect": 0.42,
+		"sun_pitch": -72.0,
+		"sun_yaw": -160.0,
+		"sun_color": Color(0.48, 0.58, 0.86),
+		"fill_color": Color(0.32, 0.42, 0.72),
+		"sky_top": Color(0.015, 0.025, 0.06),
+		"sky_horizon": Color(0.05, 0.07, 0.12),
+		"floor_tint": Color(0.22, 0.34, 0.22),
+		"board_glow_energy": 0.22,
+		"marker_glow_energy": 0.95,
+		"firefly_energy": 1.0,
+		"mood_light_scale": 1.0,
+		"forest_rim_scale": 0.85,
+	},
+	{
+		"time": 5.5,
+		"label": "日出",
+		"sun_energy": 0.035,
+		"ambient_energy": 0.42,
+		"fill_energy": 0.035,
+		"exposure": 0.88,
+		"fog_density": 0.009,
+		"fog_sky_affect": 0.36,
+		"sun_pitch": -12.0,
+		"sun_yaw": -118.0,
+		"sun_color": Color(1.0, 0.58, 0.32),
+		"fill_color": Color(0.55, 0.62, 0.86),
+		"sky_top": Color(0.18, 0.22, 0.42),
+		"sky_horizon": Color(1.0, 0.58, 0.34),
+		"floor_tint": Color(0.36, 0.48, 0.28),
+		"board_glow_energy": 0.16,
+		"marker_glow_energy": 0.84,
+		"firefly_energy": 0.55,
+		"mood_light_scale": 0.65,
+		"forest_rim_scale": 0.55,
+	},
+	{
+		"time": 9.0,
+		"label": "上午",
+		"sun_energy": 0.075,
+		"ambient_energy": 0.72,
+		"fill_energy": 0.045,
+		"exposure": 0.92,
+		"fog_density": 0.004,
+		"fog_sky_affect": 0.22,
+		"sun_pitch": -30.0,
+		"sun_yaw": -132.0,
+		"sun_color": Color(1.0, 0.86, 0.68),
+		"fill_color": Color(0.78, 0.86, 1.0),
+		"sky_top": Color(0.20, 0.42, 0.70),
+		"sky_horizon": Color(0.58, 0.76, 0.86),
+		"floor_tint": Color(0.54, 0.78, 0.42),
+		"board_glow_energy": 0.08,
+		"marker_glow_energy": 0.72,
+		"firefly_energy": 0.0,
+		"mood_light_scale": 0.1,
+		"forest_rim_scale": 0.15,
+	},
+	{
+		"time": 12.5,
+		"label": "正午",
+		"sun_energy": 0.09,
+		"ambient_energy": 0.78,
+		"fill_energy": 0.04,
+		"exposure": 0.94,
+		"fog_density": 0.0025,
+		"fog_sky_affect": 0.16,
+		"sun_pitch": -55.0,
+		"sun_yaw": -150.0,
+		"sun_color": Color(1.0, 0.96, 0.86),
+		"fill_color": Color(0.82, 0.9, 1.0),
+		"sky_top": Color(0.18, 0.48, 0.86),
+		"sky_horizon": Color(0.68, 0.84, 0.94),
+		"floor_tint": Color(0.58, 0.84, 0.46),
+		"board_glow_energy": 0.045,
+		"marker_glow_energy": 0.68,
+		"firefly_energy": 0.0,
+		"mood_light_scale": 0.0,
+		"forest_rim_scale": 0.0,
+	},
+	{
+		"time": 17.5,
+		"label": "黄昏",
+		"sun_energy": 0.055,
+		"ambient_energy": 0.54,
+		"fill_energy": 0.04,
+		"exposure": 0.88,
+		"fog_density": 0.0065,
+		"fog_sky_affect": 0.32,
+		"sun_pitch": -14.0,
+		"sun_yaw": -40.0,
+		"sun_color": Color(1.0, 0.46, 0.22),
+		"fill_color": Color(0.46, 0.54, 0.84),
+		"sky_top": Color(0.16, 0.22, 0.44),
+		"sky_horizon": Color(1.0, 0.42, 0.24),
+		"floor_tint": Color(0.42, 0.52, 0.30),
+		"board_glow_energy": 0.16,
+		"marker_glow_energy": 0.88,
+		"firefly_energy": 0.45,
+		"mood_light_scale": 0.6,
+		"forest_rim_scale": 0.45,
+	},
+	{
+		"time": 21.0,
+		"label": "夜晚",
+		"sun_energy": 0.0,
+		"ambient_energy": 0.32,
+		"fill_energy": 0.03,
+		"exposure": 0.82,
+		"fog_density": 0.010,
+		"fog_sky_affect": 0.45,
+		"sun_pitch": -68.0,
+		"sun_yaw": 40.0,
+		"sun_color": Color(0.42, 0.52, 0.86),
+		"fill_color": Color(0.28, 0.36, 0.72),
+		"sky_top": Color(0.015, 0.025, 0.06),
+		"sky_horizon": Color(0.04, 0.06, 0.12),
+		"floor_tint": Color(0.20, 0.32, 0.22),
+		"board_glow_energy": 0.24,
+		"marker_glow_energy": 1.0,
+		"firefly_energy": 1.0,
+		"mood_light_scale": 1.0,
+		"forest_rim_scale": 0.85,
+	},
+	{
+		"time": 24.0,
+		"label": "深夜",
+		"same_as": 0.0,
+	},
+]
 const LIGHTING_PRESET_ORDER := [
 	"performance_clean",
 	"quiet_forest",
@@ -232,6 +460,7 @@ const LIGHTING_PRESETS := {
 
 var _environment_node: WorldEnvironment
 var _environment: Environment
+var _procedural_sky_material: ProceduralSkyMaterial
 var _sun: DirectionalLight3D
 var _soft_fill: DirectionalLight3D
 var _board_fill_lights: Array[OmniLight3D] = []
@@ -243,20 +472,42 @@ var _floor: MeshInstance3D
 var _floor_material: StandardMaterial3D
 var _firefly_material: StandardMaterial3D
 var _props_root: Node3D
+var _grass_blade_layer: MultiMeshInstance3D
 var _noise_textures: Dictionary = {}
 var _lighting_preset_id := "soft_day"
 var _lighting_settings: Dictionary = {}
+var _render_cost_profile_id := DEFAULT_RENDER_COST_PROFILE_ID
+var _render_cost_settings: Dictionary = RENDER_COST_PROFILES[DEFAULT_RENDER_COST_PROFILE_ID].duplicate(true)
+var _time_of_day_target := 12.0
+var _time_lighting_settings: Dictionary = {}
 
 
 func _ready() -> void:
 	_configure_viewport_quality()
 	_build_world_environment()
+	_time_of_day_target = wrapf(time_of_day, 0.0, 24.0)
 	apply_lighting_preset(_lighting_preset_id)
+	_load_render_cost_profile()
 	_load_saved_lighting_settings()
+	_apply_time_of_day()
 	_build_floor()
 	_build_grass_blade_layer()
 	_build_scene_props()
 	_refresh_lighting_nodes()
+
+
+func _process(delta: float) -> void:
+	if auto_time_cycle_enabled:
+		time_of_day = wrapf(time_of_day + 24.0 * delta / maxf(day_length_seconds, 1.0), 0.0, 24.0)
+		_time_of_day_target = time_of_day
+		_apply_time_of_day()
+		return
+
+	var diff := _shortest_hour_delta(time_of_day, _time_of_day_target)
+	if absf(diff) <= 0.01:
+		return
+	time_of_day = wrapf(time_of_day + diff * minf(delta * time_transition_speed, 1.0), 0.0, 24.0)
+	_apply_time_of_day()
 
 
 func _configure_viewport_quality() -> void:
@@ -286,6 +537,7 @@ func _build_world_environment() -> void:
 		sky.sky_material = panorama
 	else:
 		var procedural := ProceduralSkyMaterial.new()
+		_procedural_sky_material = procedural
 		procedural.sky_top_color = Color(0.16, 0.34, 0.58)
 		procedural.sky_horizon_color = Color(0.54, 0.68, 0.74)
 		procedural.sky_curve = 0.18
@@ -355,6 +607,8 @@ func _build_board_accent_lights() -> void:
 		light.light_energy = 0.05
 		light.omni_range = 11.0
 		light.shadow_enabled = false
+		light.set_meta("light_group", "board_fill")
+		light.set_meta("priority", index)
 		_set_property_if_available(light, "light_specular", 0.08)
 		add_child(light)
 		_board_fill_lights.append(light)
@@ -411,6 +665,8 @@ func _build_board_glow_spots() -> void:
 		light.light_energy = 0.0
 		light.omni_range = 2.2 + radius * 2.2
 		light.shadow_enabled = false
+		light.set_meta("light_group", "board_glow")
+		light.set_meta("priority", index)
 		_set_property_if_available(light, "light_specular", 0.015)
 		root.add_child(light)
 
@@ -463,7 +719,62 @@ func get_lighting_presets() -> Array[Dictionary]:
 func get_lighting_settings() -> Dictionary:
 	var settings := _lighting_settings.duplicate(true)
 	settings["preset_id"] = _lighting_preset_id
+	settings["render_cost_profile_id"] = _render_cost_profile_id
+	settings["render_scale"] = float(_render_cost_settings.get("render_scale", settings.get("render_scale", 1.2)))
 	return settings
+
+
+func get_render_cost_profiles() -> Array[Dictionary]:
+	var profiles: Array[Dictionary] = []
+	for profile_id in RENDER_COST_PROFILE_ORDER:
+		if not RENDER_COST_PROFILES.has(profile_id):
+			continue
+		var profile: Dictionary = RENDER_COST_PROFILES[profile_id]
+		profiles.append({
+			"id": profile_id,
+			"label": String(profile.get("label", profile_id)),
+			"summary": String(profile.get("summary", "")),
+		})
+	return profiles
+
+
+func get_render_cost_profile() -> Dictionary:
+	var profile := {
+		"id": _render_cost_profile_id,
+		"label": _render_cost_profile_id,
+		"summary": "",
+	}
+	if RENDER_COST_PROFILES.has(_render_cost_profile_id):
+		var preset: Dictionary = RENDER_COST_PROFILES[_render_cost_profile_id]
+		profile["label"] = String(preset.get("label", _render_cost_profile_id))
+		profile["summary"] = String(preset.get("summary", ""))
+	for parameter in _get_render_cost_limits().keys():
+		profile[parameter] = float(_render_cost_settings.get(parameter, _get_render_cost_default(parameter)))
+	return profile
+
+
+func get_render_cost_profile_id() -> String:
+	return _render_cost_profile_id
+
+
+func get_time_of_day_presets() -> Array[Dictionary]:
+	var presets: Array[Dictionary] = []
+	for preset in TIME_OF_DAY_PRESETS:
+		presets.append((preset as Dictionary).duplicate(true))
+	return presets
+
+
+func set_time_of_day(hour: float, immediate := false) -> void:
+	_time_of_day_target = wrapf(hour, 0.0, 24.0)
+	if immediate:
+		time_of_day = _time_of_day_target
+		_apply_time_of_day()
+
+
+func set_auto_time_cycle_enabled(enabled: bool) -> void:
+	auto_time_cycle_enabled = enabled
+	if enabled:
+		_time_of_day_target = time_of_day
 
 
 func apply_lighting_preset(preset_id: String) -> void:
@@ -471,6 +782,17 @@ func apply_lighting_preset(preset_id: String) -> void:
 		return
 	_lighting_preset_id = preset_id
 	_apply_lighting_settings((LIGHTING_PRESETS[preset_id] as Dictionary).duplicate(true))
+
+
+func apply_render_cost_profile(profile_id: String, persist := true) -> void:
+	if not RENDER_COST_PROFILES.has(profile_id):
+		push_warning("Unknown render cost profile: %s" % profile_id)
+		return
+	_render_cost_profile_id = profile_id
+	_render_cost_settings = (RENDER_COST_PROFILES[profile_id] as Dictionary).duplicate(true)
+	_apply_render_cost_settings()
+	if persist:
+		_save_render_cost_profile()
 
 
 func set_lighting_value(parameter: String, value: float) -> void:
@@ -513,6 +835,26 @@ func _load_saved_lighting_settings() -> void:
 	_apply_lighting_settings(saved)
 
 
+func _save_render_cost_profile() -> void:
+	var config := ConfigFile.new()
+	config.set_value("render_cost", "profile_id", _render_cost_profile_id)
+	var save_result := config.save(RENDER_COST_PROFILE_CONFIG_PATH)
+	if save_result != OK:
+		push_warning("Failed to save render cost profile: %d" % save_result)
+
+
+func _load_render_cost_profile() -> void:
+	if DisplayServer.get_name() == "headless":
+		apply_render_cost_profile(DEFAULT_RENDER_COST_PROFILE_ID, false)
+		return
+	var config := ConfigFile.new()
+	if config.load(RENDER_COST_PROFILE_CONFIG_PATH) != OK:
+		apply_render_cost_profile(DEFAULT_RENDER_COST_PROFILE_ID, false)
+		return
+	var profile_id := String(config.get_value("render_cost", "profile_id", DEFAULT_RENDER_COST_PROFILE_ID))
+	apply_render_cost_profile(profile_id, false)
+
+
 func _apply_lighting_settings(settings: Dictionary) -> void:
 	for parameter in _get_lighting_limits().keys():
 		var limits: Vector2 = _get_lighting_limits()[parameter]
@@ -522,35 +864,133 @@ func _apply_lighting_settings(settings: Dictionary) -> void:
 	lighting_settings_changed.emit(get_lighting_settings())
 
 
+func _apply_render_cost_settings() -> void:
+	for parameter in _get_render_cost_limits().keys():
+		if not _render_cost_settings.has(parameter):
+			continue
+		var limits: Vector2 = _get_render_cost_limits()[parameter]
+		_render_cost_settings[parameter] = clampf(float(_render_cost_settings[parameter]), limits.x, limits.y)
+	_refresh_lighting_nodes()
+	render_cost_profile_changed.emit(get_render_cost_profile())
+	lighting_settings_changed.emit(get_lighting_settings())
+
+
+func _apply_time_of_day() -> void:
+	_time_lighting_settings = _sample_time_of_day_settings(time_of_day)
+	_refresh_lighting_nodes()
+
+
+func _sample_time_of_day_settings(hour: float) -> Dictionary:
+	var wrapped_hour := wrapf(hour, 0.0, 24.0)
+	var previous := _expand_time_keyframe(TIME_OF_DAY_KEYFRAMES[0])
+	var next := _expand_time_keyframe(TIME_OF_DAY_KEYFRAMES[0])
+
+	for index in range(TIME_OF_DAY_KEYFRAMES.size() - 1):
+		var a := _expand_time_keyframe(TIME_OF_DAY_KEYFRAMES[index])
+		var b := _expand_time_keyframe(TIME_OF_DAY_KEYFRAMES[index + 1])
+		var start_time := float(a.get("time", 0.0))
+		var end_time := float(b.get("time", 24.0))
+		if wrapped_hour >= start_time and wrapped_hour <= end_time:
+			previous = a
+			next = b
+			break
+
+	var previous_time := float(previous.get("time", 0.0))
+	var next_time := float(next.get("time", previous_time))
+	var span := maxf(next_time - previous_time, 0.001)
+	var t := clampf((wrapped_hour - previous_time) / span, 0.0, 1.0)
+	var result := {}
+	for key in previous.keys():
+		if key == "same_as":
+			continue
+		result[key] = previous[key]
+	for key in next.keys():
+		if key == "same_as":
+			continue
+		var a_value = previous.get(key, next[key])
+		var b_value = next[key]
+		if a_value is Color and b_value is Color:
+			result[key] = (a_value as Color).lerp(b_value as Color, t)
+		elif _is_numeric_variant(a_value) and _is_numeric_variant(b_value):
+			result[key] = lerpf(float(a_value), float(b_value), t)
+		else:
+			result[key] = b_value
+	return result
+
+
+func _expand_time_keyframe(keyframe: Dictionary) -> Dictionary:
+	if not keyframe.has("same_as"):
+		return keyframe
+	var target_time := float(keyframe.get("same_as", 0.0))
+	for candidate in TIME_OF_DAY_KEYFRAMES:
+		var candidate_dict: Dictionary = candidate
+		if not candidate_dict.has("same_as") and is_equal_approx(float(candidate_dict.get("time", -1.0)), target_time):
+			var expanded := candidate_dict.duplicate(true)
+			expanded["time"] = float(keyframe.get("time", target_time))
+			expanded["label"] = String(keyframe.get("label", expanded.get("label", "")))
+			return expanded
+	return keyframe
+
+
+func _shortest_hour_delta(from_hour: float, to_hour: float) -> float:
+	var diff := wrapf(to_hour - from_hour + 12.0, 0.0, 24.0) - 12.0
+	return diff
+
+
+func _is_numeric_variant(value) -> bool:
+	var value_type := typeof(value)
+	return value_type == TYPE_FLOAT or value_type == TYPE_INT
+
+
+func _get_final_lighting_value(key: String, fallback: float) -> float:
+	return float(_time_lighting_settings.get(key, _lighting_settings.get(key, fallback)))
+
+
+func _get_final_lighting_color(key: String, fallback: Color) -> Color:
+	var value = _time_lighting_settings.get(key, fallback)
+	return value if value is Color else fallback
+
+
 func _refresh_lighting_nodes() -> void:
 	if _environment != null:
-		_environment.ambient_light_energy = float(_lighting_settings.get("ambient_energy", 0.6))
-		_environment.tonemap_exposure = float(_lighting_settings.get("exposure", 0.92))
-		_environment.ssao_intensity = float(_lighting_settings.get("ssao_intensity", 1.0))
+		_environment.ambient_light_energy = _get_final_lighting_value("ambient_energy", 0.6)
+		_environment.tonemap_exposure = _get_final_lighting_value("exposure", 0.92)
+		_environment.ssao_intensity = (
+			float(_lighting_settings.get("ssao_intensity", 1.0))
+			* float(_render_cost_settings.get("ssao_intensity_multiplier", 1.0))
+		)
 		_environment.ssao_enabled = _environment.ssao_intensity > 0.01
-		_environment.fog_density = float(_lighting_settings.get("fog_density", 0.004))
+		_environment.fog_density = (
+			_get_final_lighting_value("fog_density", 0.004)
+			* float(_render_cost_settings.get("fog_density_multiplier", 1.0))
+		)
 		_environment.fog_enabled = _environment.fog_density > 0.0001
-		_environment.fog_sky_affect = float(_lighting_settings.get("fog_sky_affect", 0.25))
+		_environment.fog_sky_affect = _get_final_lighting_value("fog_sky_affect", 0.25)
 	if _sun != null:
-		_sun.light_energy = float(_lighting_settings.get("sun_energy", 0.4))
+		_sun.light_energy = _get_final_lighting_value("sun_energy", 0.4)
+		_sun.light_color = _get_final_lighting_color("sun_color", Color(1.0, 0.92, 0.82))
 		_sun.light_angular_distance = float(_lighting_settings.get("sun_angular_distance", 8.0))
 		_set_property_if_available(_sun, "light_specular", 0.03)
 		_sun.rotation_degrees = Vector3(
-			float(_lighting_settings.get("sun_pitch", -44.0)),
-			float(_lighting_settings.get("sun_yaw", -38.0)),
+			_get_final_lighting_value("sun_pitch", -44.0),
+			_get_final_lighting_value("sun_yaw", -38.0),
 			0.0
 		)
 	if _soft_fill != null:
-		_soft_fill.light_energy = float(_lighting_settings.get("fill_energy", 0.03)) * 1.2
+		_soft_fill.light_energy = _get_final_lighting_value("fill_energy", 0.03) * 1.2
+		_soft_fill.light_color = _get_final_lighting_color("fill_color", Color(0.78, 0.86, 1.0))
 		_set_property_if_available(_soft_fill, "light_specular", 0.12)
 	for light in _board_fill_lights:
 		if light != null:
-			light.light_energy = float(_lighting_settings.get("fill_energy", 0.03)) * float(_lighting_settings.get("board_fill_scale", 1.0))
+			light.light_energy = _get_final_lighting_value("fill_energy", 0.03) * float(_lighting_settings.get("board_fill_scale", 1.0))
 			_set_property_if_available(light, "light_specular", 0.08)
 	for spot in _board_glow_spots:
 		if spot == null:
 			continue
-		var glow_energy := float(_lighting_settings.get("board_glow_energy", 0.16))
+		var glow_energy := (
+			_get_final_lighting_value("board_glow_energy", 0.16)
+			* float(_render_cost_settings.get("board_glow_energy_multiplier", 1.0))
+		)
 		var energy_scale := float(spot.get_meta("energy_scale", 0.6))
 		spot.visible = glow_energy > 0.001
 		for child in spot.get_children():
@@ -566,18 +1006,24 @@ func _refresh_lighting_nodes() -> void:
 	for light in _forest_rim_lights:
 		if light != null:
 			light.light_energy = (
-				float(_lighting_settings.get("fill_energy", 0.03))
+				_get_final_lighting_value("fill_energy", 0.03)
 				* float(light.get_meta("energy_scale", 2.2))
-				* float(_lighting_settings.get("forest_rim_scale", 1.0))
+				* _get_final_lighting_value("forest_rim_scale", 1.0)
 			)
 	for light in _mood_lights:
 		if light != null:
-			light.light_energy = float(light.get_meta("base_energy", 0.1)) * float(_lighting_settings.get("mood_light_scale", 1.0))
+			light.light_energy = float(light.get_meta("base_energy", 0.1)) * _get_final_lighting_value("mood_light_scale", 1.0)
 	if _reflection_probe != null:
-		_reflection_probe.intensity = float(_lighting_settings.get("reflection_intensity", 0.12))
+		_reflection_probe.intensity = (
+			float(_lighting_settings.get("reflection_intensity", 0.12))
+			* float(_render_cost_settings.get("reflection_intensity_multiplier", 1.0))
+		)
 	_refresh_floor_mood()
 	_refresh_firefly_mood()
 	_refresh_marker_glow()
+	_refresh_sky_time_settings()
+	_refresh_render_cost_scene_detail()
+	_refresh_light_budget()
 	var viewport := get_viewport()
 	if viewport != null:
 		_apply_viewport_render_settings(viewport)
@@ -585,7 +1031,7 @@ func _refresh_lighting_nodes() -> void:
 
 
 func _refresh_marker_glow() -> void:
-	var glow_energy := float(_lighting_settings.get("marker_glow_energy", 0.55))
+	var glow_energy := _get_final_lighting_value("marker_glow_energy", 0.55)
 	for node in get_tree().get_nodes_in_group("view_focus_markers"):
 		if node != null and node.has_method("set_marker_glow"):
 			node.set_marker_glow(glow_energy)
@@ -619,6 +1065,22 @@ func _get_lighting_limits() -> Dictionary:
 		"firefly_energy": Vector2(0.0, 1.2),
 		"board_glow_energy": Vector2(0.0, 0.5),
 		"marker_glow_energy": Vector2(0.0, 1.6),
+	}
+
+
+func _get_render_cost_limits() -> Dictionary:
+	return {
+		"render_scale": Vector2(0.6, 1.4),
+		"msaa_level": Vector2(0.0, 4.0),
+		"fxaa_enabled": Vector2(0.0, 1.0),
+		"taa_enabled": Vector2(0.0, 1.0),
+		"debanding_enabled": Vector2(0.0, 1.0),
+		"ssao_intensity_multiplier": Vector2(0.0, 1.0),
+		"fog_density_multiplier": Vector2(0.0, 1.0),
+		"reflection_intensity_multiplier": Vector2(0.0, 1.0),
+		"board_glow_energy_multiplier": Vector2(0.0, 1.0),
+		"grass_density_multiplier": Vector2(0.0, 1.0),
+		"ground_radial_segments": Vector2(32.0, 128.0),
 	}
 
 
@@ -680,8 +1142,13 @@ func _get_lighting_default(parameter: String) -> float:
 			return 0.0
 
 
+func _get_render_cost_default(parameter: String) -> float:
+	var defaults: Dictionary = RENDER_COST_PROFILES[DEFAULT_RENDER_COST_PROFILE_ID]
+	return float(defaults.get(parameter, 0.0))
+
+
 func _apply_viewport_render_settings(viewport: Viewport) -> void:
-	var msaa_level := int(roundf(float(_lighting_settings.get("msaa_level", 2.0))))
+	var msaa_level := int(roundf(float(_render_cost_settings.get("msaa_level", 2.0))))
 	var msaa_mode := Viewport.MSAA_DISABLED
 	if msaa_level >= 4:
 		msaa_mode = Viewport.MSAA_4X
@@ -691,11 +1158,24 @@ func _apply_viewport_render_settings(viewport: Viewport) -> void:
 	_set_property_if_available(
 		viewport,
 		"screen_space_aa",
-		Viewport.SCREEN_SPACE_AA_FXAA if float(_lighting_settings.get("fxaa_enabled", 1.0)) >= 0.5 else Viewport.SCREEN_SPACE_AA_DISABLED
+		Viewport.SCREEN_SPACE_AA_FXAA if float(_render_cost_settings.get("fxaa_enabled", 1.0)) >= 0.5 else Viewport.SCREEN_SPACE_AA_DISABLED
 	)
-	_set_property_if_available(viewport, "use_taa", float(_lighting_settings.get("taa_enabled", 0.0)) >= 0.5)
-	_set_property_if_available(viewport, "use_debanding", float(_lighting_settings.get("debanding_enabled", 0.0)) >= 0.5)
-	_set_property_if_available(viewport, "scaling_3d_scale", float(_lighting_settings.get("render_scale", 1.2)))
+	_set_property_if_available(viewport, "use_taa", float(_render_cost_settings.get("taa_enabled", 0.0)) >= 0.5)
+	_set_property_if_available(viewport, "use_debanding", float(_render_cost_settings.get("debanding_enabled", 0.0)) >= 0.5)
+	_set_property_if_available(viewport, "scaling_3d_scale", float(_render_cost_settings.get("render_scale", 1.2)))
+
+
+func _refresh_render_cost_scene_detail() -> void:
+	if _grass_blade_layer != null and _grass_blade_layer.multimesh != null:
+		var ratio := clampf(float(_render_cost_settings.get("grass_density_multiplier", 1.0)), 0.0, 1.0)
+		var visible_count := int(roundf(float(grass_blade_count) * ratio))
+		_grass_blade_layer.visible = visible_count > 0
+		_grass_blade_layer.multimesh.visible_instance_count = visible_count if visible_count < grass_blade_count else -1
+	if _floor != null and _floor.mesh is CylinderMesh:
+		var floor_mesh := _floor.mesh as CylinderMesh
+		var radial_segments := int(roundf(float(_render_cost_settings.get("ground_radial_segments", 128.0))))
+		if floor_mesh.radial_segments != radial_segments:
+			floor_mesh.radial_segments = radial_segments
 
 
 func _build_floor() -> void:
@@ -707,7 +1187,7 @@ func _build_floor() -> void:
 	mesh.top_radius = floor_radius
 	mesh.bottom_radius = floor_radius
 	mesh.height = floor_height
-	mesh.radial_segments = 128
+	mesh.radial_segments = int(roundf(float(_render_cost_settings.get("ground_radial_segments", 128.0))))
 	mesh.rings = 4
 	_floor.mesh = mesh
 	_floor.material_override = _build_floor_material()
@@ -744,20 +1224,83 @@ func _build_floor_material() -> StandardMaterial3D:
 func _refresh_floor_mood() -> void:
 	if _floor_material == null:
 		return
-	_floor_material.albedo_color = Color(
+	var floor_tint := _get_final_lighting_color("floor_tint", Color(
 		float(_lighting_settings.get("floor_tint_r", 0.64)),
 		float(_lighting_settings.get("floor_tint_g", 0.94)),
 		float(_lighting_settings.get("floor_tint_b", 0.58))
-	)
+	))
+	_floor_material.albedo_color = floor_tint
 	_floor_material.normal_scale = float(_lighting_settings.get("floor_normal_scale", 0.38))
 
 
 func _refresh_firefly_mood() -> void:
 	if _firefly_material == null:
 		return
-	var energy := float(_lighting_settings.get("firefly_energy", 0.45))
+	var energy := _get_final_lighting_value("firefly_energy", 0.45)
 	_firefly_material.emission_enabled = energy > 0.01
 	_firefly_material.emission_energy_multiplier = energy
+
+
+func _refresh_sky_time_settings() -> void:
+	if _procedural_sky_material == null:
+		return
+	_procedural_sky_material.sky_top_color = _get_final_lighting_color("sky_top", _procedural_sky_material.sky_top_color)
+	_procedural_sky_material.sky_horizon_color = _get_final_lighting_color("sky_horizon", _procedural_sky_material.sky_horizon_color)
+	_procedural_sky_material.sky_energy_multiplier = clampf(_get_final_lighting_value("ambient_energy", 0.6) * 0.95, 0.18, 0.9)
+
+
+func _refresh_light_budget() -> void:
+	var budget: Dictionary = LIGHT_BUDGETS.get(_render_cost_profile_id, LIGHT_BUDGETS["high"])
+	_apply_light_group_budget(_board_fill_lights, int(budget.get("board_fill_count", 4)))
+	_apply_board_glow_light_budget(int(budget.get("board_glow_real_light_count", 8)))
+	_apply_light_group_budget(_forest_rim_lights, int(budget.get("forest_rim_count", 6)))
+	_apply_mood_light_budget(int(budget.get("mood_light_count", 8)), int(budget.get("garden_glow_real_light_count", 6)))
+
+
+func _apply_light_group_budget(lights: Array[OmniLight3D], enabled_count: int) -> void:
+	for index in range(lights.size()):
+		var light := lights[index]
+		if light == null:
+			continue
+		var enabled := index < enabled_count
+		if not enabled:
+			light.set_meta("budget_last_energy", light.light_energy)
+			light.light_energy = 0.0
+		light.visible = enabled
+
+
+func _apply_board_glow_light_budget(enabled_count: int) -> void:
+	var light_index := 0
+	for spot in _board_glow_spots:
+		if spot == null:
+			continue
+		for child in spot.get_children():
+			if child is OmniLight3D:
+				var light := child as OmniLight3D
+				var enabled := light_index < enabled_count
+				if not enabled:
+					light.light_energy = 0.0
+				light.visible = enabled
+				light_index += 1
+
+
+func _apply_mood_light_budget(mood_count: int, garden_count: int) -> void:
+	var mood_index := 0
+	var garden_index := 0
+	for light in _mood_lights:
+		if light == null:
+			continue
+		var group := String(light.get_meta("light_group", "mood"))
+		var enabled := false
+		if group == "garden_glow":
+			enabled = garden_index < garden_count
+			garden_index += 1
+		else:
+			enabled = mood_index < mood_count
+			mood_index += 1
+		if not enabled:
+			light.light_energy = 0.0
+		light.visible = enabled
 
 
 func _build_grass_blade_layer() -> void:
@@ -782,6 +1325,7 @@ func _build_grass_blade_layer() -> void:
 		multimesh.set_instance_transform(index, Transform3D(basis, position))
 
 	layer.multimesh = multimesh
+	_grass_blade_layer = layer
 	add_child(layer)
 
 
@@ -1027,6 +1571,8 @@ func _add_garden_glow(parent: Node3D, local_position: Vector3, color: Color, ene
 	light.light_color = color
 	light.light_energy = energy
 	light.set_meta("base_energy", energy)
+	light.set_meta("light_group", "garden_glow")
+	light.set_meta("priority", _mood_lights.size())
 	light.omni_range = light_range
 	light.shadow_enabled = false
 	parent.add_child(light)
@@ -1060,6 +1606,8 @@ func _add_landmark_light(parent: Node3D, local_position: Vector3, color: Color, 
 	light.light_color = color
 	light.light_energy = energy
 	light.set_meta("base_energy", energy)
+	light.set_meta("light_group", "mood")
+	light.set_meta("priority", _mood_lights.size())
 	light.omni_range = light_range
 	light.shadow_enabled = false
 	parent.add_child(light)
@@ -1104,6 +1652,8 @@ func _build_forest_rim_lights() -> void:
 		light.position = Vector3(cos(angle) * 17.5, 5.4 + float(index % 2) * 0.9, sin(angle) * 17.5)
 		light.light_color = Color(1.0, 0.68, 0.38) if index % 2 == 0 else Color(0.42, 0.62, 0.92)
 		light.set_meta("energy_scale", 2.2 if index % 2 == 0 else 1.65)
+		light.set_meta("light_group", "forest_rim")
+		light.set_meta("priority", index)
 		light.omni_range = 10.5
 		light.shadow_enabled = false
 		root.add_child(light)
