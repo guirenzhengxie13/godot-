@@ -20,6 +20,7 @@ signal render_cost_profile_changed(profile: Dictionary)
 @export var grass_blade_outer_radius := 26.8
 @export var garden_ring_inner_radius := 6.65
 @export var garden_ring_outer_radius := 8.15
+@export var cover_meadow_layout_enabled := true
 @export var target_fps := 60
 @export var time_of_day := 12.0
 @export var auto_time_cycle_enabled := false
@@ -62,6 +63,16 @@ const INNER_CORNER_ANCHORS := [
 	Vector2i(0, 4),
 	Vector2i(-4, 4),
 	Vector2i(-4, 0),
+]
+const COVER_MEADOW_PROP_POINTS := [
+	{"kind": "bridge", "position": Vector3(-8.8, 0.18, -5.8), "yaw": 28.0, "scale": 0.95},
+	{"kind": "pavilion", "position": Vector3(-4.8, 0.18, -8.8), "yaw": -18.0, "scale": 0.85},
+	{"kind": "rock_cluster", "position": Vector3(4.8, 0.18, -7.4), "yaw": 14.0, "scale": 1.15},
+	{"kind": "rock_cluster", "position": Vector3(6.6, 0.18, 3.8), "yaw": -24.0, "scale": 1.0},
+	{"kind": "flower_cluster", "position": Vector3(-7.6, 0.18, 5.2), "yaw": 8.0, "scale": 1.0},
+	{"kind": "flower_cluster", "position": Vector3(2.2, 0.18, 8.0), "yaw": -12.0, "scale": 0.9},
+	{"kind": "shrub_cluster", "position": Vector3(-6.2, 0.18, 0.8), "yaw": 34.0, "scale": 0.9},
+	{"kind": "shrub_cluster", "position": Vector3(7.4, 0.18, -1.2), "yaw": -42.0, "scale": 1.0},
 ]
 const RENDER_COST_PROFILES := {
 	"high": {
@@ -1702,6 +1713,7 @@ func _build_scene_props() -> void:
 
 	for placement in placements:
 		_spawn_prop(placement)
+	_build_cover_meadow_layout()
 	_build_corner_landmarks()
 	_build_board_garden_ring()
 	_build_garden_water_feature()
@@ -1710,6 +1722,102 @@ func _build_scene_props() -> void:
 	_build_grass_detail_ring()
 	_build_canopy_shadow_layer()
 	_build_firefly_layer()
+
+
+func _build_cover_meadow_layout() -> void:
+	if not cover_meadow_layout_enabled:
+		return
+	var layout_root := Node3D.new()
+	layout_root.name = "CoverMeadowLayout"
+	_props_root.add_child(layout_root)
+
+	for index in range(COVER_MEADOW_PROP_POINTS.size()):
+		var point: Dictionary = COVER_MEADOW_PROP_POINTS[index]
+		var kind := String(point.get("kind", "prop"))
+		var anchor := Node3D.new()
+		anchor.name = "CoverMeadow_%s_%02d" % [kind, index]
+		anchor.position = point.get("position", Vector3.ZERO)
+		anchor.rotation_degrees.y = float(point.get("yaw", 0.0))
+		anchor.scale = Vector3.ONE * float(point.get("scale", 1.0))
+		layout_root.add_child(anchor)
+
+		match kind:
+			"bridge":
+				_build_cover_meadow_bridge(anchor)
+			"pavilion":
+				_build_garden_pavilion(anchor)
+			"rock_cluster":
+				_build_cover_meadow_rock_cluster(anchor)
+			"flower_cluster":
+				_build_cover_meadow_flower_cluster(anchor)
+			"shrub_cluster":
+				_build_cover_meadow_shrub_cluster(anchor)
+			_:
+				_build_cover_meadow_rock_cluster(anchor)
+
+
+func _build_cover_meadow_bridge(parent: Node3D) -> void:
+	_add_water_ribbon(parent, [
+		Vector3(-1.95, -0.155, -0.44),
+		Vector3(-0.9, -0.155, -0.16),
+		Vector3(0.4, -0.155, 0.06),
+		Vector3(1.75, -0.155, 0.42),
+	], 1.05)
+	_build_stone_footbridge(parent, Vector3(0.0, -0.04, 0.0), 0.0)
+	for placement in [
+		{"asset": "rock_smallA.obj", "pos": Vector3(-1.7, -0.18, 0.55), "rot": -16.0, "scale": 0.72, "color": Color(0.46, 0.51, 0.47), "material": "rock"},
+		{"asset": "rock_smallA.obj", "pos": Vector3(1.6, -0.18, -0.55), "rot": 31.0, "scale": 0.64, "color": Color(0.5, 0.54, 0.5), "material": "rock"},
+		{"asset": "grass_large.obj", "pos": Vector3(-1.3, -0.18, -0.82), "rot": 18.0, "scale": 0.72, "color": Color(0.36, 0.74, 0.28), "material": "grass"},
+		{"asset": "grass_large.obj", "pos": Vector3(1.25, -0.18, 0.8), "rot": -24.0, "scale": 0.68, "color": Color(0.4, 0.72, 0.3), "material": "grass"},
+	]:
+		_spawn_prop_from_root(KENNEY_PROP_ROOT, placement, parent)
+
+
+func _build_cover_meadow_rock_cluster(parent: Node3D) -> void:
+	var placements := [
+		{"asset": "rock_largeA.obj", "pos": Vector3(-0.34, -0.18, 0.1), "rot": 8.0, "scale": 0.96, "color": Color(0.52, 0.56, 0.52), "material": "rock"},
+		{"asset": "rock_smallA.obj", "pos": Vector3(0.72, -0.18, -0.35), "rot": -32.0, "scale": 0.72, "color": Color(0.48, 0.53, 0.49), "material": "rock"},
+		{"asset": "rock_smallA.obj", "pos": Vector3(0.24, -0.18, 0.72), "rot": 43.0, "scale": 0.58, "color": Color(0.55, 0.58, 0.53), "material": "rock"},
+		{"asset": "grass_large.obj", "pos": Vector3(-0.86, -0.18, -0.56), "rot": 22.0, "scale": 0.62, "color": Color(0.36, 0.68, 0.27), "material": "grass"},
+	]
+	for placement in placements:
+		_spawn_prop_from_root(KENNEY_PROP_ROOT, placement, parent)
+
+
+func _build_cover_meadow_flower_cluster(parent: Node3D) -> void:
+	var colors := [
+		Color(0.96, 0.74, 0.24),
+		Color(0.94, 0.48, 0.56),
+		Color(0.72, 0.62, 0.98),
+		Color(1.0, 0.86, 0.34),
+	]
+	for index in range(9):
+		var angle := TAU * float(index) / 9.0
+		var radius := 0.25 + 0.12 * float(index % 3)
+		_spawn_prop_from_root(KENNEY_PROP_ROOT, {
+			"asset": "flower_yellowA.obj",
+			"pos": Vector3(cos(angle) * radius, -0.18, sin(angle) * radius),
+			"rot": rad_to_deg(angle) + 18.0 * float(index % 2),
+			"scale": 0.48 + 0.08 * float(index % 3),
+			"color": colors[index % colors.size()],
+			"material": "flower",
+		}, parent)
+	for placement in [
+		{"asset": "grass_large.obj", "pos": Vector3(-0.52, -0.18, -0.42), "rot": -12.0, "scale": 0.52, "color": Color(0.36, 0.72, 0.28), "material": "grass"},
+		{"asset": "grass_large.obj", "pos": Vector3(0.58, -0.18, 0.42), "rot": 27.0, "scale": 0.48, "color": Color(0.42, 0.76, 0.3), "material": "grass"},
+	]:
+		_spawn_prop_from_root(KENNEY_PROP_ROOT, placement, parent)
+
+
+func _build_cover_meadow_shrub_cluster(parent: Node3D) -> void:
+	var placements := [
+		{"asset": "plant_bush.obj", "pos": Vector3(-0.48, -0.18, -0.28), "rot": -18.0, "scale": 0.86, "color": Color(0.24, 0.58, 0.24), "material": "leaf_dark"},
+		{"asset": "plant_bush.obj", "pos": Vector3(0.42, -0.18, 0.2), "rot": 28.0, "scale": 0.72, "color": Color(0.28, 0.64, 0.26), "material": "leaf"},
+		{"asset": "rock_smallA.obj", "pos": Vector3(0.82, -0.18, -0.45), "rot": 43.0, "scale": 0.42, "color": Color(0.5, 0.54, 0.49), "material": "rock"},
+		{"asset": "flower_yellowA.obj", "pos": Vector3(-0.82, -0.18, 0.44), "rot": -8.0, "scale": 0.42, "color": Color(0.94, 0.72, 0.26), "material": "flower"},
+	]
+	for placement in placements:
+		_spawn_prop_from_root(KENNEY_PROP_ROOT, placement, parent)
 
 
 func _build_corner_landmarks() -> void:
@@ -2065,7 +2173,7 @@ func _spawn_prop(placement: Dictionary) -> void:
 
 func _spawn_prop_from_root(asset_root: String, placement: Dictionary, parent: Node3D) -> void:
 	var path := "%s/%s" % [asset_root, String(placement.get("asset", ""))]
-	var resource = load(path)
+	var resource = load(path) if ResourceLoader.exists(path) else null
 	var node: Node3D
 
 	if resource is Mesh:
