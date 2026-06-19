@@ -14,6 +14,8 @@ signal player_material_changed(player_id: int, profile: Dictionary)
 @export var material_root := "res://assets/materials"
 @export var board_texture_edge_padding: float = 0.58
 
+const COVER_MEADOW_STONE_ID := "cover_meadow_stone"
+
 var cells: Dictionary = {}
 var pieces: Dictionary = {}
 var player_starts: Dictionary = {}
@@ -488,6 +490,19 @@ func _scan_material_options() -> void:
 		"category": "内置",
 		"profile": {},
 	})
+	material_options.append({
+		"id": COVER_MEADOW_STONE_ID,
+		"label": "封面浅石板",
+		"category": "内置",
+		"profile": {
+			"base_color": Color(0.80, 0.78, 0.66),
+			"side_color": Color(0.45, 0.50, 0.34),
+			"roughness": 0.58,
+			"normal_scale": 0.025,
+			"clearcoat": 0.18,
+			"clearcoat_roughness": 0.42,
+		},
+	})
 
 	var root_dir := DirAccess.open(material_root)
 	if root_dir == null:
@@ -503,11 +518,7 @@ func _scan_material_options() -> void:
 
 
 func _choose_initial_materials() -> void:
-	_board_material_id = _first_existing_material_id([
-		"大理石/Marble023",
-		"大理石/Onyx014",
-		"大理石/Travertine003",
-	], _first_material_id_by_category("大理石"))
+	_board_material_id = COVER_MEADOW_STONE_ID
 	_player_material_ids[1] = _first_existing_material_id([
 		"大理石/Onyx014",
 		"大理石/Marble023",

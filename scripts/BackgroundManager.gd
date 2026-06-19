@@ -289,6 +289,7 @@ const TIME_OF_DAY_KEYFRAMES := [
 	},
 ]
 const LIGHTING_PRESET_ORDER := [
+	"cover_meadow",
 	"performance_clean",
 	"quiet_forest",
 	"balanced_clear",
@@ -299,6 +300,35 @@ const LIGHTING_PRESET_ORDER := [
 	"supersample_mirror",
 ]
 const LIGHTING_PRESETS := {
+	"cover_meadow": {
+		"label": "封面花园",
+		"ambient_energy": 0.82,
+		"sun_energy": 0.105,
+		"fill_energy": 0.055,
+		"reflection_intensity": 0.045,
+		"exposure": 0.96,
+		"ssao_intensity": 0.72,
+		"render_scale": 1.2,
+		"msaa_level": 2.0,
+		"fxaa_enabled": 1.0,
+		"taa_enabled": 0.0,
+		"debanding_enabled": 1.0,
+		"floor_tint_r": 0.58,
+		"floor_tint_g": 0.82,
+		"floor_tint_b": 0.42,
+		"floor_normal_scale": 0.16,
+		"fog_density": 0.0018,
+		"fog_sky_affect": 0.10,
+		"sun_pitch": -38.0,
+		"sun_yaw": -132.0,
+		"sun_angular_distance": 12.0,
+		"board_fill_scale": 0.75,
+		"forest_rim_scale": 0.0,
+		"mood_light_scale": 0.0,
+		"firefly_energy": 0.0,
+		"board_glow_energy": 0.035,
+		"marker_glow_energy": 0.58,
+	},
 	"performance_clean": {
 		"label": "性能清爽",
 		"ambient_energy": 0.72,
@@ -510,7 +540,7 @@ var _firefly_material: StandardMaterial3D
 var _props_root: Node3D
 var _grass_blade_layer: MultiMeshInstance3D
 var _noise_textures: Dictionary = {}
-var _lighting_preset_id := "soft_day"
+var _lighting_preset_id := "cover_meadow"
 var _lighting_settings: Dictionary = {}
 var _render_cost_profile_id := DEFAULT_RENDER_COST_PROFILE_ID
 var _render_cost_settings: Dictionary = RENDER_COST_PROFILES[DEFAULT_RENDER_COST_PROFILE_ID].duplicate(true)
@@ -1013,6 +1043,12 @@ func set_auto_time_cycle_enabled(enabled: bool) -> void:
 	auto_time_cycle_enabled = enabled
 	if enabled:
 		_time_of_day_target = time_of_day
+
+
+func apply_cover_meadow_visual_target() -> void:
+	apply_lighting_preset("cover_meadow")
+	set_time_of_day(9.0, true)
+	set_auto_time_cycle_enabled(false)
 
 
 func apply_lighting_preset(preset_id: String) -> void:

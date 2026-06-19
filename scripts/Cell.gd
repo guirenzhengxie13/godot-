@@ -219,6 +219,8 @@ func _set_color(color: Color, force_tint := false) -> void:
 	if _material == null:
 		return
 	var color_path := String(_material_profile.get("color_path", ""))
+	var normal_color := _get_profile_color("base_color", color)
+	var side_color := _get_profile_color("side_color", normal_color.darkened(0.34))
 	if force_tint:
 		_material.albedo_texture = null
 		_material.albedo_color = color
@@ -229,9 +231,9 @@ func _set_color(color: Color, force_tint := false) -> void:
 		return
 
 	_material.albedo_texture = load(color_path) if not color_path.is_empty() else null
-	_material.albedo_color = Color.WHITE if not color_path.is_empty() else color
+	_material.albedo_color = Color.WHITE if not color_path.is_empty() else normal_color
 	_material.emission_enabled = false
-	_side_material.albedo_color = color.darkened(0.34)
+	_side_material.albedo_color = side_color
 
 
 func _apply_material_profile() -> void:
@@ -240,17 +242,37 @@ func _apply_material_profile() -> void:
 
 	var color_path := String(_material_profile.get("color_path", ""))
 	var normal_path := String(_material_profile.get("normal_path", ""))
+	var normal_color := _get_profile_color("base_color", base_color)
+	var side_color := _get_profile_color("side_color", normal_color.darkened(0.34))
+	var clearcoat := clampf(float(_material_profile.get("clearcoat", 1.0)), 0.0, 1.0)
 
 	_material.albedo_texture = load(color_path) if not color_path.is_empty() else null
-	_material.albedo_color = Color.WHITE if not color_path.is_empty() else base_color
+	_material.albedo_color = Color.WHITE if not color_path.is_empty() else normal_color
 	_material.normal_enabled = not normal_path.is_empty()
 	_material.normal_texture = load(normal_path) if not normal_path.is_empty() else null
-	_material.normal_scale = 0.1
+	_material.normal_scale = clampf(float(_material_profile.get("normal_scale", 0.1)), 0.0, 1.0)
 	_material.roughness_texture = null
 	_material.roughness = clampf(float(_material_profile.get("roughness", 0.5)), 0.42, 0.68)
 	_material.metallic = 0.0
 	_material.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
-	_material.clearcoat_enabled = true
-	_material.clearcoat_roughness = 0.34
+	_material.clearcoat_enabled = clearcoat > 0.001
+	_set_material_property_if_available(_material, "clearcoat", clearcoat)
+	_material.clearcoat_roughness = clampf(float(_material_profile.get("clearcoat_roughness", 0.34)), 0.0, 1.0)
+	_material.emission_enabled = false
+	_side_material.albedo_color = side_color
 	_apply_texture_filter(_material)
 	_apply_board_texture_mapping()
+
+
+func _get_profile_color(key: String, fallback: Color) -> Color:
+	var value = _material_profile.get(key, fallback)
+	if value is Color:
+		return value
+	return fallback
+
+
+func _set_material_property_if_available(material: Object, property_name: String, value) -> void:
+	for property in material.get_property_list():
+		if String(property.get("name", "")) == property_name:
+			material.set(property_name, value)
+			return
