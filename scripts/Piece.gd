@@ -39,6 +39,7 @@ func setup(new_player_id: int, new_coord: Vector2i, world_position: Vector3, new
 	name = "Piece_P%d_%d_%d" % [player_id, coord.x, coord.y]
 	_update_color()
 	_update_status_labels()
+	_update_skill_visuals()
 
 
 func set_coord(new_coord: Vector2i, world_position: Vector3) -> void:
@@ -92,7 +93,7 @@ func _ensure_visuals() -> void:
 		_mesh_instance.name = "MeshInstance3D"
 		add_child(_mesh_instance)
 
-	_mesh_instance.mesh = _create_default_mesh()
+	_mesh_instance.mesh = _create_piece_variant_mesh()
 
 	_material = StandardMaterial3D.new()
 	_material.roughness = 0.56
@@ -200,7 +201,26 @@ func _update_skill_visuals() -> void:
 			_mesh_instance.mesh = _create_immune_mesh()
 			_add_immune_visuals()
 		_:
-			_mesh_instance.mesh = _create_default_mesh()
+			_mesh_instance.mesh = _create_piece_variant_mesh()
+
+
+func _create_piece_variant_mesh() -> PrimitiveMesh:
+	match _get_piece_visual_variant():
+		1:
+			return _create_low_dome_mesh()
+		2:
+			return _create_tall_bead_mesh()
+		3:
+			return _create_faceted_gem_mesh()
+		_:
+			return _create_default_mesh()
+
+
+func _get_piece_visual_variant() -> int:
+	var key := piece_id
+	if key.is_empty():
+		key = "%d_%d_%d" % [player_id, coord.x, coord.y]
+	return absi(hash(key)) % 4
 
 
 func _create_default_mesh() -> SphereMesh:
@@ -209,6 +229,33 @@ func _create_default_mesh() -> SphereMesh:
 	mesh.height = radius * 2.0
 	mesh.radial_segments = 32
 	mesh.rings = 16
+	return mesh
+
+
+func _create_low_dome_mesh() -> SphereMesh:
+	var mesh := SphereMesh.new()
+	mesh.radius = radius * 1.08
+	mesh.height = radius * 1.58
+	mesh.radial_segments = 32
+	mesh.rings = 12
+	return mesh
+
+
+func _create_tall_bead_mesh() -> CapsuleMesh:
+	var mesh := CapsuleMesh.new()
+	mesh.radius = radius * 0.78
+	mesh.height = radius * 2.25
+	mesh.radial_segments = 24
+	mesh.rings = 10
+	return mesh
+
+
+func _create_faceted_gem_mesh() -> CylinderMesh:
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = radius * 0.58
+	mesh.bottom_radius = radius * 0.96
+	mesh.height = radius * 1.65
+	mesh.radial_segments = 8
 	return mesh
 
 

@@ -13,13 +13,13 @@ signal render_cost_profile_changed(profile: Dictionary)
 @export var floor_height := 0.12
 @export var floor_uv_repeat := 10.0
 @export var prop_radius := 18.0
-@export var grass_detail_inner_radius := 8.6
+@export var grass_detail_inner_radius := 10.2
 @export var edge_tree_radius := 24.8
 @export var grass_blade_count := 720
 @export var grass_blade_inner_radius := 10.4
 @export var grass_blade_outer_radius := 26.8
-@export var garden_ring_inner_radius := 6.65
-@export var garden_ring_outer_radius := 8.15
+@export var garden_ring_inner_radius := 10.4
+@export var garden_ring_outer_radius := 12.3
 @export var cover_meadow_layout_enabled := true
 @export var target_fps := 60
 @export var time_of_day := 12.0
@@ -48,6 +48,7 @@ signal render_cost_profile_changed(profile: Dictionary)
 
 const KENNEY_PROP_ROOT := "res://assets/environment/kenney_nature"
 const KENNEY_LANDMARK_ROOT := "res://assets/environment/kenney_landmarks"
+const DOWNLOADED_MATERIAL_ROOT := "res://assets/environment/downloaded_materials/polyhaven"
 const LIGHTING_PROFILE_PATH := "user://lighting_profile.cfg"
 const RENDER_COST_PROFILE_CONFIG_PATH := "user://render_cost_profile.cfg"
 const DEFAULT_RENDER_COST_PROFILE_ID := "high"
@@ -65,14 +66,15 @@ const INNER_CORNER_ANCHORS := [
 	Vector2i(-4, 0),
 ]
 const COVER_MEADOW_PROP_POINTS := [
-	{"kind": "bridge", "position": Vector3(-8.8, 0.18, -5.8), "yaw": 28.0, "scale": 0.95},
-	{"kind": "pavilion", "position": Vector3(-4.8, 0.18, -8.8), "yaw": -18.0, "scale": 0.85},
-	{"kind": "rock_cluster", "position": Vector3(4.8, 0.18, -7.4), "yaw": 14.0, "scale": 1.15},
-	{"kind": "rock_cluster", "position": Vector3(6.6, 0.18, 3.8), "yaw": -24.0, "scale": 1.0},
-	{"kind": "flower_cluster", "position": Vector3(-7.6, 0.18, 5.2), "yaw": 8.0, "scale": 1.0},
-	{"kind": "flower_cluster", "position": Vector3(2.2, 0.18, 8.0), "yaw": -12.0, "scale": 0.9},
-	{"kind": "shrub_cluster", "position": Vector3(-6.2, 0.18, 0.8), "yaw": 34.0, "scale": 0.9},
-	{"kind": "shrub_cluster", "position": Vector3(7.4, 0.18, -1.2), "yaw": -42.0, "scale": 1.0},
+	{"kind": "pond", "position": Vector3(-12.8, 0.18, 5.8), "yaw": -18.0, "scale": 1.0},
+	{"kind": "bridge", "position": Vector3(-12.2, 0.18, -6.8), "yaw": 28.0, "scale": 0.95},
+	{"kind": "pavilion", "position": Vector3(-5.4, 0.18, -12.2), "yaw": -18.0, "scale": 0.78},
+	{"kind": "rock_cluster", "position": Vector3(8.8, 0.18, -10.2), "yaw": 14.0, "scale": 0.9},
+	{"kind": "rock_cluster", "position": Vector3(12.4, 0.18, 3.8), "yaw": -24.0, "scale": 0.86},
+	{"kind": "flower_cluster", "position": Vector3(-10.7, 0.18, 10.1), "yaw": 8.0, "scale": 0.92},
+	{"kind": "flower_cluster", "position": Vector3(3.6, 0.18, 12.6), "yaw": -12.0, "scale": 0.86},
+	{"kind": "shrub_cluster", "position": Vector3(-11.8, 0.18, 0.2), "yaw": 34.0, "scale": 0.82},
+	{"kind": "shrub_cluster", "position": Vector3(12.6, 0.18, -2.6), "yaw": -42.0, "scale": 0.88},
 ]
 const RENDER_COST_PROFILES := {
 	"high": {
@@ -1730,6 +1732,7 @@ func _build_cover_meadow_layout() -> void:
 	var layout_root := Node3D.new()
 	layout_root.name = "CoverMeadowLayout"
 	_props_root.add_child(layout_root)
+	_add_cover_meadow_ground_patches(layout_root)
 
 	for index in range(COVER_MEADOW_PROP_POINTS.size()):
 		var point: Dictionary = COVER_MEADOW_PROP_POINTS[index]
@@ -1742,6 +1745,8 @@ func _build_cover_meadow_layout() -> void:
 		layout_root.add_child(anchor)
 
 		match kind:
+			"pond":
+				_build_cover_meadow_pond(anchor)
 			"bridge":
 				_build_cover_meadow_bridge(anchor)
 			"pavilion":
@@ -1754,6 +1759,80 @@ func _build_cover_meadow_layout() -> void:
 				_build_cover_meadow_shrub_cluster(anchor)
 			_:
 				_build_cover_meadow_rock_cluster(anchor)
+
+
+func _add_cover_meadow_ground_patches(parent: Node3D) -> void:
+	var material := _build_downloaded_surface_material(
+		"aerial_grass_rock_diff_1k.jpg",
+		"aerial_grass_rock_nor_gl_1k.jpg",
+		"aerial_grass_rock_rough_1k.jpg",
+		Color(0.38, 0.62, 0.27),
+		"grass"
+	)
+	var placements := [
+		{"pos": Vector3(-12.7, 0.026, 5.6), "scale": Vector3(4.6, 1.0, 3.2), "rot": -18.0},
+		{"pos": Vector3(-11.9, 0.026, -6.7), "scale": Vector3(4.4, 1.0, 2.9), "rot": 24.0},
+		{"pos": Vector3(10.8, 0.026, -7.0), "scale": Vector3(4.8, 1.0, 3.5), "rot": -12.0},
+		{"pos": Vector3(7.9, 0.026, 10.3), "scale": Vector3(5.2, 1.0, 3.1), "rot": 16.0},
+	]
+	for index in range(placements.size()):
+		var mesh := CylinderMesh.new()
+		mesh.top_radius = 1.0
+		mesh.bottom_radius = 1.0
+		mesh.height = 0.018
+		mesh.radial_segments = 28
+		var patch := MeshInstance3D.new()
+		patch.name = "CoverMeadowGround_%02d" % index
+		patch.mesh = mesh
+		patch.position = placements[index]["pos"]
+		patch.scale = placements[index]["scale"]
+		patch.rotation_degrees.y = float(placements[index]["rot"])
+		patch.material_override = material
+		patch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		parent.add_child(patch)
+
+
+func _build_cover_meadow_pond(parent: Node3D) -> void:
+	var bank_mesh := CylinderMesh.new()
+	bank_mesh.top_radius = 1.0
+	bank_mesh.bottom_radius = 1.0
+	bank_mesh.height = 0.045
+	bank_mesh.radial_segments = 40
+	var bank := MeshInstance3D.new()
+	bank.name = "PebbleBank"
+	bank.mesh = bank_mesh
+	bank.position = Vector3(0.0, -0.135, 0.0)
+	bank.scale = Vector3(2.65, 1.0, 1.65)
+	bank.material_override = _build_downloaded_surface_material(
+		"clean_pebbles_diff_1k.jpg",
+		"clean_pebbles_nor_gl_1k.jpg",
+		"clean_pebbles_rough_1k.jpg",
+		Color(0.54, 0.52, 0.46),
+		"rock"
+	)
+	parent.add_child(bank)
+
+	var water_mesh := CylinderMesh.new()
+	water_mesh.top_radius = 1.0
+	water_mesh.bottom_radius = 1.0
+	water_mesh.height = 0.028
+	water_mesh.radial_segments = 48
+	var water := MeshInstance3D.new()
+	water.name = "PondWater"
+	water.mesh = water_mesh
+	water.position = Vector3(0.0, -0.095, 0.0)
+	water.scale = Vector3(2.2, 1.0, 1.25)
+	water.material_override = _build_water_material()
+	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(water)
+
+	for placement in [
+		{"asset": "rock_smallA.obj", "pos": Vector3(-2.15, -0.16, -0.72), "rot": 20.0, "scale": 0.64, "color": Color(0.48, 0.52, 0.48), "material": "rock"},
+		{"asset": "rock_smallA.obj", "pos": Vector3(2.0, -0.16, 0.74), "rot": -32.0, "scale": 0.58, "color": Color(0.52, 0.55, 0.5), "material": "rock"},
+		{"asset": "plant_bush.obj", "pos": Vector3(-1.8, -0.16, 1.12), "rot": 12.0, "scale": 0.62, "color": Color(0.25, 0.58, 0.25), "material": "leaf"},
+		{"asset": "flower_yellowA.obj", "pos": Vector3(1.7, -0.16, -1.05), "rot": -18.0, "scale": 0.48, "color": Color(0.95, 0.68, 0.28), "material": "flower"},
+	]:
+		_spawn_prop_from_root(KENNEY_PROP_ROOT, placement, parent)
 
 
 func _build_cover_meadow_bridge(parent: Node3D) -> void:
@@ -1961,6 +2040,23 @@ func _build_water_material() -> StandardMaterial3D:
 	material.emission_enabled = true
 	material.emission = Color(0.04, 0.18, 0.2)
 	material.emission_energy_multiplier = 0.28
+	return material
+
+
+func _build_downloaded_surface_material(diffuse_name: String, normal_name: String, roughness_name: String, fallback_color: Color, material_kind: String) -> StandardMaterial3D:
+	var material := _build_prop_material(fallback_color, material_kind)
+	var diffuse_path := "%s/%s" % [DOWNLOADED_MATERIAL_ROOT, diffuse_name]
+	var normal_path := "%s/%s" % [DOWNLOADED_MATERIAL_ROOT, normal_name]
+	var roughness_path := "%s/%s" % [DOWNLOADED_MATERIAL_ROOT, roughness_name]
+	if ResourceLoader.exists(diffuse_path):
+		material.albedo_texture = load(diffuse_path)
+		material.albedo_color = fallback_color.lightened(0.08)
+	if ResourceLoader.exists(normal_path):
+		material.normal_enabled = true
+		material.normal_texture = load(normal_path)
+		material.normal_scale = 0.16
+	if ResourceLoader.exists(roughness_path):
+		material.roughness_texture = load(roughness_path)
 	return material
 
 
