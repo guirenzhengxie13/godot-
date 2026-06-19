@@ -22,8 +22,9 @@ signal render_cost_profile_changed(profile: Dictionary)
 @export var garden_ring_outer_radius := 12.3
 @export var cover_meadow_layout_enabled := true
 @export var target_fps := 60
-@export var time_of_day := 12.0
+@export var time_of_day := 10.0
 @export var auto_time_cycle_enabled := false
+@export var force_cover_meadow_on_start := true
 @export var day_length_seconds := 240.0
 @export var time_transition_speed := 4.0
 @export var board_manager_path: NodePath = ^"../BoardManager"
@@ -206,44 +207,44 @@ const TIME_OF_DAY_KEYFRAMES := [
 	{
 		"time": 9.0,
 		"label": "上午",
-		"sun_energy": 0.075,
-		"ambient_energy": 0.72,
-		"fill_energy": 0.045,
-		"exposure": 0.92,
-		"fog_density": 0.004,
-		"fog_sky_affect": 0.22,
-		"sun_pitch": -30.0,
+		"sun_energy": 0.42,
+		"ambient_energy": 0.88,
+		"fill_energy": 0.075,
+		"exposure": 1.02,
+		"fog_density": 0.0008,
+		"fog_sky_affect": 0.05,
+		"sun_pitch": -34.0,
 		"sun_yaw": -132.0,
-		"sun_color": Color(1.0, 0.86, 0.68),
-		"fill_color": Color(0.78, 0.86, 1.0),
-		"sky_top": Color(0.20, 0.42, 0.70),
-		"sky_horizon": Color(0.58, 0.76, 0.86),
-		"floor_tint": Color(0.54, 0.78, 0.42),
-		"board_glow_energy": 0.08,
-		"marker_glow_energy": 0.72,
+		"sun_color": Color(1.0, 0.88, 0.66),
+		"fill_color": Color(0.86, 0.92, 1.0),
+		"sky_top": Color(0.34, 0.58, 0.88),
+		"sky_horizon": Color(0.76, 0.88, 0.96),
+		"floor_tint": Color(0.70, 0.92, 0.46),
+		"board_glow_energy": 0.015,
+		"marker_glow_energy": 0.48,
 		"firefly_energy": 0.0,
-		"mood_light_scale": 0.1,
-		"forest_rim_scale": 0.15,
+		"mood_light_scale": 0.0,
+		"forest_rim_scale": 0.0,
 		"inner_lamp_scale": 0.0,
 	},
 	{
 		"time": 12.5,
 		"label": "正午",
-		"sun_energy": 0.09,
-		"ambient_energy": 0.78,
-		"fill_energy": 0.04,
-		"exposure": 0.94,
-		"fog_density": 0.0025,
-		"fog_sky_affect": 0.16,
-		"sun_pitch": -55.0,
+		"sun_energy": 0.48,
+		"ambient_energy": 0.92,
+		"fill_energy": 0.06,
+		"exposure": 1.0,
+		"fog_density": 0.0006,
+		"fog_sky_affect": 0.04,
+		"sun_pitch": -58.0,
 		"sun_yaw": -150.0,
-		"sun_color": Color(1.0, 0.96, 0.86),
-		"fill_color": Color(0.82, 0.9, 1.0),
-		"sky_top": Color(0.18, 0.48, 0.86),
-		"sky_horizon": Color(0.68, 0.84, 0.94),
-		"floor_tint": Color(0.58, 0.84, 0.46),
-		"board_glow_energy": 0.045,
-		"marker_glow_energy": 0.68,
+		"sun_color": Color(1.0, 0.96, 0.84),
+		"fill_color": Color(0.88, 0.94, 1.0),
+		"sky_top": Color(0.28, 0.58, 0.92),
+		"sky_horizon": Color(0.78, 0.90, 0.98),
+		"floor_tint": Color(0.68, 0.94, 0.48),
+		"board_glow_energy": 0.0,
+		"marker_glow_energy": 0.45,
 		"firefly_energy": 0.0,
 		"mood_light_scale": 0.0,
 		"forest_rim_scale": 0.0,
@@ -252,35 +253,35 @@ const TIME_OF_DAY_KEYFRAMES := [
 	{
 		"time": 17.5,
 		"label": "黄昏",
-		"sun_energy": 0.055,
-		"ambient_energy": 0.54,
-		"fill_energy": 0.04,
-		"exposure": 0.88,
-		"fog_density": 0.0065,
-		"fog_sky_affect": 0.32,
+		"sun_energy": 0.30,
+		"ambient_energy": 0.72,
+		"fill_energy": 0.07,
+		"exposure": 0.98,
+		"fog_density": 0.002,
+		"fog_sky_affect": 0.12,
 		"sun_pitch": -14.0,
 		"sun_yaw": -40.0,
-		"sun_color": Color(1.0, 0.46, 0.22),
-		"fill_color": Color(0.46, 0.54, 0.84),
-		"sky_top": Color(0.16, 0.22, 0.44),
-		"sky_horizon": Color(1.0, 0.42, 0.24),
-		"floor_tint": Color(0.42, 0.52, 0.30),
-		"board_glow_energy": 0.16,
-		"marker_glow_energy": 0.88,
-		"firefly_energy": 0.45,
-		"mood_light_scale": 0.6,
-		"forest_rim_scale": 0.45,
-		"inner_lamp_scale": 0.65,
+		"sun_color": Color(1.0, 0.58, 0.30),
+		"fill_color": Color(0.62, 0.70, 0.95),
+		"sky_top": Color(0.32, 0.38, 0.68),
+		"sky_horizon": Color(1.0, 0.56, 0.34),
+		"floor_tint": Color(0.62, 0.78, 0.38),
+		"board_glow_energy": 0.06,
+		"marker_glow_energy": 0.66,
+		"firefly_energy": 0.10,
+		"mood_light_scale": 0.25,
+		"forest_rim_scale": 0.15,
+		"inner_lamp_scale": 0.25,
 	},
 	{
 		"time": 21.0,
 		"label": "夜晚",
 		"sun_energy": 0.0,
-		"ambient_energy": 0.32,
+		"ambient_energy": 0.38,
 		"fill_energy": 0.03,
-		"exposure": 0.82,
-		"fog_density": 0.010,
-		"fog_sky_affect": 0.45,
+		"exposure": 0.90,
+		"fog_density": 0.006,
+		"fog_sky_affect": 0.25,
 		"sun_pitch": -68.0,
 		"sun_yaw": 40.0,
 		"sun_color": Color(0.42, 0.52, 0.86),
@@ -320,7 +321,7 @@ const LIGHTING_PRESETS := {
 		"fill_energy": 0.055,
 		"reflection_intensity": 0.045,
 		"exposure": 0.96,
-		"ssao_intensity": 0.72,
+		"ssao_intensity": 0.38,
 		"render_scale": 1.2,
 		"msaa_level": 2.0,
 		"fxaa_enabled": 1.0,
@@ -330,8 +331,8 @@ const LIGHTING_PRESETS := {
 		"floor_tint_g": 0.82,
 		"floor_tint_b": 0.42,
 		"floor_normal_scale": 0.16,
-		"fog_density": 0.0018,
-		"fog_sky_affect": 0.10,
+		"fog_density": 0.0008,
+		"fog_sky_affect": 0.04,
 		"sun_pitch": -38.0,
 		"sun_yaw": -132.0,
 		"sun_angular_distance": 12.0,
@@ -557,7 +558,7 @@ var _lighting_preset_id := "cover_meadow"
 var _lighting_settings: Dictionary = {}
 var _render_cost_profile_id := DEFAULT_RENDER_COST_PROFILE_ID
 var _render_cost_settings: Dictionary = RENDER_COST_PROFILES[DEFAULT_RENDER_COST_PROFILE_ID].duplicate(true)
-var _time_of_day_target := 12.0
+var _time_of_day_target := 10.0
 var _time_lighting_settings: Dictionary = {}
 var _board_manager: Node = null
 var _inner_lamps_root: Node3D
@@ -580,6 +581,7 @@ func _ready() -> void:
 	_build_scene_props()
 	_refresh_lighting_nodes()
 	call_deferred("_build_inner_board_lamps")
+	call_deferred("_apply_cover_meadow_on_start_if_needed")
 
 
 func _process(delta: float) -> void:
@@ -1060,8 +1062,13 @@ func set_auto_time_cycle_enabled(enabled: bool) -> void:
 
 func apply_cover_meadow_visual_target() -> void:
 	apply_lighting_preset("cover_meadow")
-	set_time_of_day(9.0, true)
+	set_time_of_day(10.0, true)
 	set_auto_time_cycle_enabled(false)
+
+
+func _apply_cover_meadow_on_start_if_needed() -> void:
+	if force_cover_meadow_on_start:
+		apply_cover_meadow_visual_target()
 
 
 func apply_lighting_preset(preset_id: String) -> void:
