@@ -25,6 +25,23 @@ signal render_cost_profile_changed(profile: Dictionary)
 @export var auto_time_cycle_enabled := false
 @export var day_length_seconds := 240.0
 @export var time_transition_speed := 4.0
+@export var board_manager_path: NodePath = ^"../BoardManager"
+
+@export_group("Inner Board Lamps")
+@export var inner_lamps_enabled := true
+@export var inner_lamp_outset := 0.95
+@export var inner_lamp_height := 2.4
+@export var inner_lamp_light_height := 2.15
+@export var inner_lamp_pole_radius := 0.045
+@export var inner_lamp_pole_color := Color(0.18, 0.14, 0.10)
+@export var inner_lamp_shade_color := Color(0.12, 0.09, 0.06)
+@export var inner_lamp_bulb_radius := 0.105
+@export var inner_lamp_energy := 0.75
+@export var inner_lamp_range := 7.0
+@export var inner_lamp_spot_angle := 38.0
+@export var inner_lamp_spot_attenuation := 1.2
+@export var inner_lamp_color := Color(1.0, 0.76, 0.46)
+@export var inner_lamp_debug_markers := false
 
 const KENNEY_PROP_ROOT := "res://assets/environment/kenney_nature"
 const KENNEY_LANDMARK_ROOT := "res://assets/environment/kenney_landmarks"
@@ -35,6 +52,14 @@ const RENDER_COST_PROFILE_ORDER := [
 	"high",
 	"medium",
 	"low",
+]
+const INNER_CORNER_ANCHORS := [
+	Vector2i(0, -4),
+	Vector2i(4, -4),
+	Vector2i(4, 0),
+	Vector2i(0, 4),
+	Vector2i(-4, 4),
+	Vector2i(-4, 0),
 ]
 const RENDER_COST_PROFILES := {
 	"high": {
@@ -90,6 +115,7 @@ const LIGHT_BUDGETS := {
 		"forest_rim_count": 6,
 		"mood_light_count": 8,
 		"garden_glow_real_light_count": 6,
+		"inner_lamp_real_light_count": 6,
 	},
 	"medium": {
 		"board_fill_count": 2,
@@ -97,6 +123,7 @@ const LIGHT_BUDGETS := {
 		"forest_rim_count": 3,
 		"mood_light_count": 4,
 		"garden_glow_real_light_count": 3,
+		"inner_lamp_real_light_count": 4,
 	},
 	"low": {
 		"board_fill_count": 1,
@@ -104,6 +131,7 @@ const LIGHT_BUDGETS := {
 		"forest_rim_count": 0,
 		"mood_light_count": 2,
 		"garden_glow_real_light_count": 0,
+		"inner_lamp_real_light_count": 2,
 	},
 }
 const TIME_OF_DAY_PRESETS := [
@@ -135,6 +163,7 @@ const TIME_OF_DAY_KEYFRAMES := [
 		"firefly_energy": 1.0,
 		"mood_light_scale": 1.0,
 		"forest_rim_scale": 0.85,
+		"inner_lamp_scale": 1.0,
 	},
 	{
 		"time": 5.5,
@@ -157,6 +186,7 @@ const TIME_OF_DAY_KEYFRAMES := [
 		"firefly_energy": 0.55,
 		"mood_light_scale": 0.65,
 		"forest_rim_scale": 0.55,
+		"inner_lamp_scale": 0.45,
 	},
 	{
 		"time": 9.0,
@@ -179,6 +209,7 @@ const TIME_OF_DAY_KEYFRAMES := [
 		"firefly_energy": 0.0,
 		"mood_light_scale": 0.1,
 		"forest_rim_scale": 0.15,
+		"inner_lamp_scale": 0.0,
 	},
 	{
 		"time": 12.5,
@@ -201,6 +232,7 @@ const TIME_OF_DAY_KEYFRAMES := [
 		"firefly_energy": 0.0,
 		"mood_light_scale": 0.0,
 		"forest_rim_scale": 0.0,
+		"inner_lamp_scale": 0.0,
 	},
 	{
 		"time": 17.5,
@@ -223,6 +255,7 @@ const TIME_OF_DAY_KEYFRAMES := [
 		"firefly_energy": 0.45,
 		"mood_light_scale": 0.6,
 		"forest_rim_scale": 0.45,
+		"inner_lamp_scale": 0.65,
 	},
 	{
 		"time": 21.0,
@@ -245,6 +278,7 @@ const TIME_OF_DAY_KEYFRAMES := [
 		"firefly_energy": 1.0,
 		"mood_light_scale": 1.0,
 		"forest_rim_scale": 0.85,
+		"inner_lamp_scale": 1.0,
 	},
 	{
 		"time": 24.0,
@@ -480,6 +514,12 @@ var _render_cost_profile_id := DEFAULT_RENDER_COST_PROFILE_ID
 var _render_cost_settings: Dictionary = RENDER_COST_PROFILES[DEFAULT_RENDER_COST_PROFILE_ID].duplicate(true)
 var _time_of_day_target := 12.0
 var _time_lighting_settings: Dictionary = {}
+var _board_manager: Node = null
+var _inner_lamps_root: Node3D
+var _inner_board_lamps: Array[Node3D] = []
+var _inner_lamp_lights: Array[SpotLight3D] = []
+var _inner_lamp_bulbs: Array[MeshInstance3D] = []
+var _inner_lamp_debug_lines: Array[MeshInstance3D] = []
 
 
 func _ready() -> void:
@@ -494,6 +534,7 @@ func _ready() -> void:
 	_build_grass_blade_layer()
 	_build_scene_props()
 	_refresh_lighting_nodes()
+	call_deferred("_build_inner_board_lamps")
 
 
 func _process(delta: float) -> void:
@@ -698,6 +739,195 @@ func _build_board_reflection_probe() -> void:
 	_reflection_probe.update_mode = ReflectionProbe.UPDATE_ONCE
 	add_child(_reflection_probe)
 	_refresh_lighting_nodes()
+
+
+func _resolve_board_manager() -> void:
+	if board_manager_path != NodePath("") and has_node(board_manager_path):
+		_board_manager = get_node(board_manager_path)
+		return
+	var root := get_parent()
+	if root != null and root.has_node("BoardManager"):
+		_board_manager = root.get_node("BoardManager")
+
+
+func _build_inner_board_lamps() -> void:
+	_clear_inner_board_lamps()
+	if not inner_lamps_enabled:
+		return
+	_resolve_board_manager()
+	if _board_manager == null or not _board_manager.has_method("coord_to_world"):
+		push_warning("Inner board lamps skipped: BoardManager not found or coord_to_world missing.")
+		return
+
+	_inner_lamps_root = Node3D.new()
+	_inner_lamps_root.name = "InnerBoardLamps"
+	add_child(_inner_lamps_root)
+
+	for index in range(INNER_CORNER_ANCHORS.size()):
+		var anchor_coord: Vector2i = INNER_CORNER_ANCHORS[index]
+		var anchor_world: Vector3 = _get_board_coord_global_position(anchor_coord)
+		var outward := Vector3(anchor_world.x, 0.0, anchor_world.z)
+		if outward.length_squared() < 0.001:
+			outward = Vector3.FORWARD
+		else:
+			outward = outward.normalized()
+
+		var lamp_world := anchor_world + outward * inner_lamp_outset
+		var lamp := _create_inner_board_lamp(index, to_local(lamp_world), outward)
+		_inner_lamps_root.add_child(lamp)
+		_inner_board_lamps.append(lamp)
+		_aim_inner_lamp_light(lamp)
+
+		if inner_lamp_debug_markers:
+			_add_inner_lamp_debug_marker(anchor_world, Color(0.35, 0.8, 1.0))
+			_add_inner_lamp_debug_marker(lamp_world, Color(1.0, 0.74, 0.22))
+
+	_refresh_inner_board_lamps()
+	_refresh_light_budget()
+
+
+func _clear_inner_board_lamps() -> void:
+	_inner_board_lamps.clear()
+	_inner_lamp_lights.clear()
+	_inner_lamp_bulbs.clear()
+	_inner_lamp_debug_lines.clear()
+	if _inner_lamps_root != null:
+		_inner_lamps_root.queue_free()
+		_inner_lamps_root = null
+
+
+func _get_board_coord_global_position(coord: Vector2i) -> Vector3:
+	var local_position: Vector3 = _board_manager.coord_to_world(coord)
+	if _board_manager is Node3D:
+		return (_board_manager as Node3D).to_global(local_position)
+	return local_position
+
+
+func _create_inner_board_lamp(index: int, local_position: Vector3, outward: Vector3) -> Node3D:
+	var lamp := Node3D.new()
+	lamp.name = "InnerLamp_%d" % index
+	lamp.position = local_position
+	lamp.rotation.y = atan2(outward.x, outward.z)
+
+	var pole := MeshInstance3D.new()
+	pole.name = "Pole"
+	var pole_mesh := CylinderMesh.new()
+	pole_mesh.height = inner_lamp_height
+	pole_mesh.top_radius = inner_lamp_pole_radius
+	pole_mesh.bottom_radius = inner_lamp_pole_radius
+	pole_mesh.radial_segments = 12
+	pole.mesh = pole_mesh
+	pole.position = Vector3(0.0, inner_lamp_height * 0.5, 0.0)
+	pole.material_override = _make_lamp_pole_material()
+	lamp.add_child(pole)
+
+	var arm := MeshInstance3D.new()
+	arm.name = "Arm"
+	var arm_mesh := CylinderMesh.new()
+	arm_mesh.height = 0.55
+	arm_mesh.top_radius = inner_lamp_pole_radius * 0.65
+	arm_mesh.bottom_radius = inner_lamp_pole_radius * 0.65
+	arm_mesh.radial_segments = 10
+	arm.mesh = arm_mesh
+	arm.position = Vector3(0.0, inner_lamp_light_height, -0.23)
+	arm.rotation_degrees.x = 90.0
+	arm.material_override = _make_lamp_pole_material()
+	lamp.add_child(arm)
+
+	var shade := MeshInstance3D.new()
+	shade.name = "Shade"
+	var shade_mesh := CylinderMesh.new()
+	shade_mesh.height = 0.22
+	shade_mesh.bottom_radius = 0.24
+	shade_mesh.top_radius = 0.11
+	shade_mesh.radial_segments = 16
+	shade.mesh = shade_mesh
+	shade.position = Vector3(0.0, inner_lamp_light_height - 0.03, -0.46)
+	shade.rotation_degrees.x = 180.0
+	shade.material_override = _make_lamp_shade_material()
+	lamp.add_child(shade)
+
+	var bulb := MeshInstance3D.new()
+	bulb.name = "Bulb"
+	var bulb_mesh := SphereMesh.new()
+	bulb_mesh.radius = inner_lamp_bulb_radius
+	bulb_mesh.height = inner_lamp_bulb_radius * 2.0
+	bulb_mesh.radial_segments = 16
+	bulb_mesh.rings = 8
+	bulb.mesh = bulb_mesh
+	bulb.position = Vector3(0.0, inner_lamp_light_height - 0.12, -0.46)
+	bulb.material_override = _make_lamp_bulb_material(0.0)
+	lamp.add_child(bulb)
+	_inner_lamp_bulbs.append(bulb)
+
+	var light := SpotLight3D.new()
+	light.name = "LampLight"
+	light.position = bulb.position
+	light.light_color = inner_lamp_color
+	light.light_energy = 0.0
+	light.spot_range = inner_lamp_range
+	light.spot_angle = inner_lamp_spot_angle
+	light.spot_attenuation = inner_lamp_spot_attenuation
+	light.shadow_enabled = false
+	light.set_meta("light_group", "inner_lamp")
+	light.set_meta("priority", index)
+	lamp.add_child(light)
+	_inner_lamp_lights.append(light)
+
+	return lamp
+
+
+func _aim_inner_lamp_light(lamp: Node3D) -> void:
+	var light := lamp.get_node_or_null("LampLight") as SpotLight3D
+	if light == null:
+		return
+	light.look_at(Vector3(0.0, 0.25, 0.0), Vector3.UP)
+
+
+func _add_inner_lamp_debug_marker(global_position: Vector3, color: Color) -> void:
+	if _inner_lamps_root == null:
+		return
+	var marker := MeshInstance3D.new()
+	marker.name = "InnerLampDebugMarker"
+	var mesh := SphereMesh.new()
+	mesh.radius = 0.08
+	mesh.height = 0.16
+	marker.mesh = mesh
+	marker.global_position = global_position + Vector3.UP * 0.08
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	material.emission_enabled = true
+	material.emission = color
+	material.emission_energy_multiplier = 0.6
+	marker.material_override = material
+	_inner_lamps_root.add_child(marker)
+	_inner_lamp_debug_lines.append(marker)
+
+
+func _make_lamp_pole_material() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = inner_lamp_pole_color
+	material.roughness = 0.65
+	material.metallic = 0.15
+	return material
+
+
+func _make_lamp_shade_material() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = inner_lamp_shade_color
+	material.roughness = 0.75
+	material.metallic = 0.05
+	return material
+
+
+func _make_lamp_bulb_material(energy: float) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.albedo_color = inner_lamp_color
+	material.emission_enabled = true
+	material.emission = inner_lamp_color
+	material.emission_energy_multiplier = energy
+	return material
 
 
 func get_lighting_presets() -> Array[Dictionary]:
@@ -1023,6 +1253,7 @@ func _refresh_lighting_nodes() -> void:
 	_refresh_marker_glow()
 	_refresh_sky_time_settings()
 	_refresh_render_cost_scene_detail()
+	_refresh_inner_board_lamps()
 	_refresh_light_budget()
 	var viewport := get_viewport()
 	if viewport != null:
@@ -1241,6 +1472,35 @@ func _refresh_firefly_mood() -> void:
 	_firefly_material.emission_energy_multiplier = energy
 
 
+func _refresh_inner_board_lamps() -> void:
+	if _inner_board_lamps.is_empty():
+		return
+	var scale := _get_final_lighting_value("inner_lamp_scale", 0.0)
+	var final_energy := inner_lamp_energy * scale
+	var bulb_energy := clampf(scale * 1.8, 0.0, 2.2)
+	for lamp in _inner_board_lamps:
+		if is_instance_valid(lamp):
+			lamp.visible = inner_lamps_enabled
+	for bulb in _inner_lamp_bulbs:
+		if not is_instance_valid(bulb):
+			continue
+		bulb.visible = inner_lamps_enabled
+		if bulb.material_override is StandardMaterial3D:
+			var material := bulb.material_override as StandardMaterial3D
+			material.albedo_color = inner_lamp_color
+			material.emission = inner_lamp_color
+			material.emission_energy_multiplier = bulb_energy
+	for light in _inner_lamp_lights:
+		if not is_instance_valid(light):
+			continue
+		light.light_color = inner_lamp_color
+		light.spot_range = inner_lamp_range
+		light.spot_angle = inner_lamp_spot_angle
+		light.spot_attenuation = inner_lamp_spot_attenuation
+		light.shadow_enabled = false
+		light.light_energy = final_energy if inner_lamps_enabled else 0.0
+
+
 func _refresh_sky_time_settings() -> void:
 	if _procedural_sky_material == null:
 		return
@@ -1255,6 +1515,7 @@ func _refresh_light_budget() -> void:
 	_apply_board_glow_light_budget(int(budget.get("board_glow_real_light_count", 8)))
 	_apply_light_group_budget(_forest_rim_lights, int(budget.get("forest_rim_count", 6)))
 	_apply_mood_light_budget(int(budget.get("mood_light_count", 8)), int(budget.get("garden_glow_real_light_count", 6)))
+	_apply_light_budget_to_lamps(_inner_lamp_lights, int(budget.get("inner_lamp_real_light_count", 6)))
 
 
 func _apply_light_group_budget(lights: Array[OmniLight3D], enabled_count: int) -> void:
@@ -1298,6 +1559,17 @@ func _apply_mood_light_budget(mood_count: int, garden_count: int) -> void:
 		else:
 			enabled = mood_index < mood_count
 			mood_index += 1
+		if not enabled:
+			light.light_energy = 0.0
+		light.visible = enabled
+
+
+func _apply_light_budget_to_lamps(lights: Array[SpotLight3D], active_count: int) -> void:
+	for index in range(lights.size()):
+		var light := lights[index]
+		if not is_instance_valid(light):
+			continue
+		var enabled := index < active_count and inner_lamps_enabled and light.light_energy > 0.001
 		if not enabled:
 			light.light_energy = 0.0
 		light.visible = enabled
