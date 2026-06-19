@@ -36,11 +36,13 @@ signal render_cost_profile_changed(profile: Dictionary)
 @export var inner_lamp_pole_color := Color(0.18, 0.14, 0.10)
 @export var inner_lamp_shade_color := Color(0.12, 0.09, 0.06)
 @export var inner_lamp_bulb_radius := 0.105
-@export var inner_lamp_energy := 0.75
-@export var inner_lamp_range := 7.0
-@export var inner_lamp_spot_angle := 38.0
-@export var inner_lamp_spot_attenuation := 1.2
+@export var inner_lamp_energy := 2.8
+@export var inner_lamp_range := 10.0
+@export var inner_lamp_spot_angle := 62.0
+@export var inner_lamp_spot_attenuation := 0.75
 @export var inner_lamp_color := Color(1.0, 0.76, 0.46)
+@export var inner_lamp_aim_center_blend := 0.55
+@export var inner_lamp_aim_height := 0.06
 @export var inner_lamp_debug_markers := false
 
 const KENNEY_PROP_ROOT := "res://assets/environment/kenney_nature"
@@ -773,7 +775,10 @@ func _build_inner_board_lamps() -> void:
 			outward = outward.normalized()
 
 		var lamp_world := anchor_world + outward * inner_lamp_outset
+		var aim_world := lamp_world.lerp(Vector3.ZERO, inner_lamp_aim_center_blend)
+		aim_world.y = inner_lamp_aim_height
 		var lamp := _create_inner_board_lamp(index, to_local(lamp_world), outward)
+		lamp.set_meta("lamp_aim_world", aim_world)
 		_inner_lamps_root.add_child(lamp)
 		_inner_board_lamps.append(lamp)
 		_aim_inner_lamp_light(lamp)
@@ -781,6 +786,7 @@ func _build_inner_board_lamps() -> void:
 		if inner_lamp_debug_markers:
 			_add_inner_lamp_debug_marker(anchor_world, Color(0.35, 0.8, 1.0))
 			_add_inner_lamp_debug_marker(lamp_world, Color(1.0, 0.74, 0.22))
+			_add_inner_lamp_debug_marker(aim_world, Color(1.0, 0.32, 0.18))
 
 	_refresh_inner_board_lamps()
 	_refresh_light_budget()
@@ -881,7 +887,9 @@ func _aim_inner_lamp_light(lamp: Node3D) -> void:
 	var light := lamp.get_node_or_null("LampLight") as SpotLight3D
 	if light == null:
 		return
-	light.look_at(Vector3(0.0, 0.25, 0.0), Vector3.UP)
+	var aim_value = lamp.get_meta("lamp_aim_world", Vector3(0.0, inner_lamp_aim_height, 0.0))
+	var aim_world: Vector3 = aim_value if aim_value is Vector3 else Vector3(0.0, inner_lamp_aim_height, 0.0)
+	light.look_at(aim_world, Vector3.UP)
 
 
 func _add_inner_lamp_debug_marker(global_position: Vector3, color: Color) -> void:
