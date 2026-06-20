@@ -17,6 +17,16 @@ signal player_material_changed(player_id: int, profile: Dictionary)
 const COVER_MEADOW_STONE_ID := "cover_meadow_stone"
 const FIXED_BOARD_MARBLE_ID := "大理石/Travertine003"
 const FIXED_BOARD_MARBLE_SUFFIX := "003"
+const PIECE_COLOR_PALETTE := [
+	{"id": "piece_red", "label": "红色", "base_color": Color(0.90, 0.12, 0.10)},
+	{"id": "piece_blue", "label": "蓝色", "base_color": Color(0.12, 0.34, 0.95)},
+	{"id": "piece_yellow", "label": "黄色", "base_color": Color(1.00, 0.76, 0.10)},
+	{"id": "piece_green", "label": "绿色", "base_color": Color(0.12, 0.68, 0.28)},
+	{"id": "piece_orange", "label": "橙色", "base_color": Color(1.00, 0.42, 0.08)},
+	{"id": "piece_purple", "label": "紫色", "base_color": Color(0.58, 0.25, 0.95)},
+	{"id": "piece_cyan", "label": "青色", "base_color": Color(0.05, 0.72, 0.95)},
+	{"id": "piece_pink", "label": "粉色", "base_color": Color(1.00, 0.34, 0.62)},
+]
 
 var cells: Dictionary = {}
 var pieces: Dictionary = {}
@@ -259,7 +269,18 @@ func get_all_aura_coverage(skill_rules) -> Array[Vector2i]:
 func get_material_options() -> Array[Dictionary]:
 	if material_options.is_empty():
 		_scan_material_options()
-	return [_get_material_option_by_id(_resolve_fixed_board_material_id())]
+	var options: Array[Dictionary] = []
+	var board_option := _get_material_option_by_id(_resolve_fixed_board_material_id())
+	board_option["usage"] = "board"
+	board_option["label"] = "Travertine003 大理石（固定）"
+	options.append(board_option)
+	for color_option in PIECE_COLOR_PALETTE:
+		var option: Dictionary = (color_option as Dictionary).duplicate(true)
+		option["usage"] = "piece"
+		option["category"] = "内置颜色"
+		option["profile"] = _build_piece_color_profile(option)
+		options.append(option)
+	return options
 
 
 func get_material_selection() -> Dictionary:
@@ -521,16 +542,8 @@ func _scan_material_options() -> void:
 
 func _choose_initial_materials() -> void:
 	_board_material_id = _resolve_fixed_board_material_id()
-	_player_material_ids[1] = _first_existing_material_id([
-		"大理石/Onyx014",
-		"大理石/Marble023",
-		"大理石/Travertine003",
-	], _first_material_id_by_category("大理石"))
-	_player_material_ids[2] = _first_existing_material_id([
-		"大理石/Travertine003",
-		"大理石/Onyx014",
-		"大理石/Marble023",
-	], _first_non_default_material_id())
+	_player_material_ids[1] = "piece_red"
+	_player_material_ids[2] = "piece_blue"
 
 
 func _scan_material_category(category: String) -> void:
@@ -589,10 +602,30 @@ func _build_material_profile(material_path: String) -> Dictionary:
 
 
 func _get_material_profile(material_id: String) -> Dictionary:
+	var piece_profile := _get_piece_color_profile(material_id)
+	if not piece_profile.is_empty():
+		return piece_profile
 	for option in material_options:
 		if String(option.get("id", "")) == material_id:
 			return (option.get("profile", {}) as Dictionary).duplicate(true)
 	return {}
+
+
+func _get_piece_color_profile(color_id: String) -> Dictionary:
+	for option in PIECE_COLOR_PALETTE:
+		if String((option as Dictionary).get("id", "")) == color_id:
+			return _build_piece_color_profile(option as Dictionary)
+	return {}
+
+
+func _build_piece_color_profile(option: Dictionary) -> Dictionary:
+	return {
+		"base_color": option.get("base_color", Color.WHITE),
+		"roughness": 0.46,
+		"normal_scale": 0.0,
+		"clearcoat": 0.22,
+		"clearcoat_roughness": 0.30,
+	}
 
 
 func _get_material_option_by_id(material_id: String) -> Dictionary:

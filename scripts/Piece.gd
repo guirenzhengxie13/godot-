@@ -125,6 +125,8 @@ func _update_color() -> void:
 		_material.albedo_color = selected_color
 	elif _is_inspected:
 		_material.albedo_color = inspected_color
+	elif _material_profile.has("base_color"):
+		_material.albedo_color = _material_profile.get("base_color", Color.WHITE)
 	elif player_id == 1:
 		_material.albedo_color = Color.WHITE if _material_profile.has("color_path") else player_one_color
 	else:
@@ -141,15 +143,23 @@ func _apply_material_profile() -> void:
 	_material.albedo_texture = load(color_path) if not color_path.is_empty() else null
 	_material.normal_enabled = not normal_path.is_empty()
 	_material.normal_texture = load(normal_path) if not normal_path.is_empty() else null
-	_material.normal_scale = 0.12
+	_material.normal_scale = clampf(float(_material_profile.get("normal_scale", 0.12)), 0.0, 1.0)
 	_material.roughness_texture = null
 	_material.roughness = clampf(float(_material_profile.get("roughness", 0.56)), 0.42, 0.68)
 	_material.metallic = 0.0
 	_material.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
 	_material.clearcoat_enabled = true
-	_material.clearcoat_roughness = 0.36
+	_set_material_property_if_available(_material, "clearcoat", clampf(float(_material_profile.get("clearcoat", 1.0)), 0.0, 1.0))
+	_material.clearcoat_roughness = clampf(float(_material_profile.get("clearcoat_roughness", 0.36)), 0.0, 1.0)
 	_material.emission_enabled = false
 	_material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+
+
+func _set_material_property_if_available(material: Object, property_name: String, value) -> void:
+	for property in material.get_property_list():
+		if String(property.get("name", "")) == property_name:
+			material.set(property_name, value)
+			return
 
 
 func _ensure_status_labels() -> void:

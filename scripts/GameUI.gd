@@ -289,9 +289,9 @@ func set_analysis_status(status: String) -> void:
 
 func set_material_options(options: Array[Dictionary]) -> void:
 	_material_options = options.duplicate(true)
-	_populate_material_option(_board_material_option, String(_material_selection.get("board", "default")))
-	_populate_material_option(_player_one_material_option, String(_material_selection.get("player_1", "default")))
-	_populate_material_option(_player_two_material_option, String(_material_selection.get("player_2", "default")))
+	_populate_material_option(_board_material_option, "board", String(_material_selection.get("board", "default")))
+	_populate_material_option(_player_one_material_option, "player", String(_material_selection.get("player_1", "default")))
+	_populate_material_option(_player_two_material_option, "player", String(_material_selection.get("player_2", "default")))
 
 
 func set_material_selection(selection: Dictionary) -> void:
@@ -748,9 +748,9 @@ func _build_pause_menu() -> void:
 	_board_material_option = _build_material_option_row(box, "棋盘", "board")
 	_player_one_material_option = _build_material_option_row(box, "玩家 1 棋子", "player_1")
 	_player_two_material_option = _build_material_option_row(box, "玩家 2 棋子", "player_2")
-	_populate_material_option(_board_material_option, String(_material_selection.get("board", "default")))
-	_populate_material_option(_player_one_material_option, String(_material_selection.get("player_1", "default")))
-	_populate_material_option(_player_two_material_option, String(_material_selection.get("player_2", "default")))
+	_populate_material_option(_board_material_option, "board", String(_material_selection.get("board", "default")))
+	_populate_material_option(_player_one_material_option, "player", String(_material_selection.get("player_1", "default")))
+	_populate_material_option(_player_two_material_option, "player", String(_material_selection.get("player_2", "default")))
 
 	var lighting_button := Button.new()
 	lighting_button.text = "光影设置"
@@ -1150,19 +1150,30 @@ func _build_material_option_row(parent: VBoxContainer, label_text: String, targe
 	return option
 
 
-func _populate_material_option(option: OptionButton, selected_id := "default") -> void:
+func _populate_material_option(option: OptionButton, target_usage := "", selected_id := "default") -> void:
 	if option == null:
 		return
 
 	option.clear()
 	for index in range(_material_options.size()):
 		var material_option := _material_options[index]
+		if not _material_option_matches_usage(material_option, target_usage):
+			continue
 		option.add_item(String(material_option.get("label", "材质 %d" % index)))
-		option.set_item_metadata(index, String(material_option.get("id", "default")))
-	if _material_options.is_empty():
+		option.set_item_metadata(option.item_count - 1, String(material_option.get("id", "default")))
+	if option.item_count == 0:
 		option.add_item("默认颜色")
 		option.set_item_metadata(0, "default")
 	_select_material_option(option, selected_id)
+
+
+func _material_option_matches_usage(option: Dictionary, target_usage: String) -> bool:
+	var usage := String(option.get("usage", ""))
+	if usage.is_empty() or target_usage.is_empty():
+		return true
+	if target_usage == "player":
+		return usage == "piece"
+	return usage == target_usage
 
 
 func _select_material_option(option: OptionButton, material_id: String) -> void:
