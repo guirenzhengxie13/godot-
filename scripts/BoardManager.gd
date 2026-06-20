@@ -15,6 +15,8 @@ signal player_material_changed(player_id: int, profile: Dictionary)
 @export var board_texture_edge_padding: float = 0.58
 
 const COVER_MEADOW_STONE_ID := "cover_meadow_stone"
+const FIXED_BOARD_MARBLE_ID := "大理石/Travertine003"
+const FIXED_BOARD_MARBLE_SUFFIX := "003"
 
 var cells: Dictionary = {}
 var pieces: Dictionary = {}
@@ -257,7 +259,7 @@ func get_all_aura_coverage(skill_rules) -> Array[Vector2i]:
 func get_material_options() -> Array[Dictionary]:
 	if material_options.is_empty():
 		_scan_material_options()
-	return material_options.duplicate(true)
+	return [_get_material_option_by_id(_resolve_fixed_board_material_id())]
 
 
 func get_material_selection() -> Dictionary:
@@ -269,8 +271,8 @@ func get_material_selection() -> Dictionary:
 
 
 func apply_board_material(material_id: String) -> void:
-	_board_material_id = material_id
-	var profile := _get_material_profile(material_id)
+	_board_material_id = _resolve_fixed_board_material_id()
+	var profile := _get_material_profile(_board_material_id)
 	for cell in cells.values():
 		if cell != null and cell.has_method("set_material_profile"):
 			cell.set_material_profile(profile)
@@ -518,7 +520,7 @@ func _scan_material_options() -> void:
 
 
 func _choose_initial_materials() -> void:
-	_board_material_id = COVER_MEADOW_STONE_ID
+	_board_material_id = _resolve_fixed_board_material_id()
 	_player_material_ids[1] = _first_existing_material_id([
 		"大理石/Onyx014",
 		"大理石/Marble023",
@@ -591,6 +593,30 @@ func _get_material_profile(material_id: String) -> Dictionary:
 		if String(option.get("id", "")) == material_id:
 			return (option.get("profile", {}) as Dictionary).duplicate(true)
 	return {}
+
+
+func _get_material_option_by_id(material_id: String) -> Dictionary:
+	for option in material_options:
+		if String(option.get("id", "")) == material_id:
+			return (option as Dictionary).duplicate(true)
+	return {
+		"id": COVER_MEADOW_STONE_ID,
+		"label": "封面浅石板",
+		"category": "内置",
+		"profile": _get_material_profile(COVER_MEADOW_STONE_ID),
+	}
+
+
+func _resolve_fixed_board_material_id() -> String:
+	if _has_material_id(FIXED_BOARD_MARBLE_ID):
+		return FIXED_BOARD_MARBLE_ID
+	for option in material_options:
+		var id := String(option.get("id", ""))
+		var category := String(option.get("category", ""))
+		if category == "大理石" and id.get_file().ends_with(FIXED_BOARD_MARBLE_SUFFIX):
+			return id
+	push_warning("Fixed 003 marble board material was not found; using cover meadow stone fallback.")
+	return COVER_MEADOW_STONE_ID
 
 
 func _first_existing_material_id(preferred_ids: Array, fallback_id: String) -> String:
