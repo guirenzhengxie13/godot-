@@ -11,7 +11,7 @@ signal render_cost_profile_changed(profile: Dictionary)
 @export var floor_roughness_path := "res://assets/environment/leafy_grass_rough_1k.jpg"
 @export var floor_radius := 38.0
 @export var floor_height := 0.12
-@export var floor_uv_repeat := 10.0
+@export var floor_uv_repeat := 5.5
 @export var prop_radius := 18.0
 @export var grass_detail_inner_radius := 10.2
 @export var edge_tree_radius := 24.8
@@ -21,6 +21,7 @@ signal render_cost_profile_changed(profile: Dictionary)
 @export var garden_ring_inner_radius := 10.4
 @export var garden_ring_outer_radius := 12.3
 @export var cover_meadow_layout_enabled := true
+@export var cover_meadow_clean_floor := true
 @export var target_fps := 60
 @export var time_of_day := 10.0
 @export var auto_time_cycle_enabled := false
@@ -1493,25 +1494,28 @@ func _build_floor() -> void:
 func _build_floor_material() -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	_floor_material = material
-	material.albedo_color = Color(0.64, 0.94, 0.58)
-	material.roughness = 0.84
+	material.albedo_color = Color(0.70, 0.92, 0.48)
+	material.roughness = 0.78
 	material.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
-	material.normal_scale = 0.38
+	material.normal_enabled = false
+	material.normal_scale = 0.0
 	material.uv1_scale = Vector3(floor_uv_repeat, floor_uv_repeat, 1.0)
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 
-	var albedo = load(floor_albedo_path)
-	if albedo != null:
-		material.albedo_texture = albedo
+	if not cover_meadow_clean_floor:
+		var albedo = load(floor_albedo_path)
+		if albedo != null:
+			material.albedo_texture = albedo
 
-	var normal = load(floor_normal_path)
-	if normal != null:
-		material.normal_enabled = true
-		material.normal_texture = normal
+		var normal = load(floor_normal_path)
+		if normal != null:
+			material.normal_enabled = true
+			material.normal_texture = normal
+			material.normal_scale = 0.38
 
-	var roughness = load(floor_roughness_path)
-	if roughness != null:
-		material.roughness_texture = roughness
+		var roughness = load(floor_roughness_path)
+		if roughness != null:
+			material.roughness_texture = roughness
 
 	return material
 
@@ -1525,7 +1529,11 @@ func _refresh_floor_mood() -> void:
 		float(_lighting_settings.get("floor_tint_b", 0.58))
 	))
 	_floor_material.albedo_color = floor_tint
-	_floor_material.normal_scale = float(_lighting_settings.get("floor_normal_scale", 0.38))
+	if cover_meadow_clean_floor:
+		_floor_material.normal_enabled = false
+		_floor_material.normal_scale = 0.0
+	else:
+		_floor_material.normal_scale = float(_lighting_settings.get("floor_normal_scale", 0.38))
 
 
 func _refresh_firefly_mood() -> void:
