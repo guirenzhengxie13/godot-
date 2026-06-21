@@ -12,11 +12,16 @@ extends Node3D
 
 const VIEW_FOCUS_MARKER_SCRIPT := preload("res://scripts/ViewFocusMarker.gd")
 const INNER_CORNER_PROP_ROOT := "res://assets/environment/kenney_nature"
+const SIDE_PLAYER_COLORS := [
+	Color(0.90, 0.12, 0.10),
+	Color(0.12, 0.34, 0.95),
+	Color(1.00, 0.76, 0.10),
+	Color(0.12, 0.68, 0.28),
+	Color(0.58, 0.25, 0.95),
+	Color(0.05, 0.72, 0.95),
+]
 
-var _markers_by_player := {
-	1: [],
-	2: [],
-}
+var _markers_by_player: Dictionary = {}
 var _decor_materials: Dictionary = {}
 
 
@@ -47,6 +52,8 @@ func _build_markers() -> void:
 			marker.set_material_profile(board_manager.get_player_material_profile(player_id), _get_player_fallback_color(player_id))
 		marker.marker_clicked.connect(_on_marker_clicked)
 		add_child(marker)
+		if not _markers_by_player.has(player_id):
+			_markers_by_player[player_id] = []
 		_markers_by_player[player_id].append(marker)
 		var decor_angle := TAU * float(index) / 6.0
 		var decor_direction := Vector3(cos(decor_angle), 0.0, sin(decor_angle))
@@ -109,10 +116,9 @@ func _on_player_material_changed(player_id: int, profile: Dictionary) -> void:
 
 
 func _get_marker_player(view_index: int) -> int:
-	return 1 if view_index % 2 == 0 else 2
+	return view_index + 1
 
 
 func _get_player_fallback_color(player_id: int) -> Color:
-	if player_id == 1:
-		return Color(0.9, 0.16, 0.18)
-	return Color(0.1, 0.35, 0.9)
+	var index := clampi(player_id - 1, 0, SIDE_PLAYER_COLORS.size() - 1)
+	return SIDE_PLAYER_COLORS[index]
