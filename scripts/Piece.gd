@@ -167,9 +167,9 @@ func _ensure_status_labels() -> void:
 	_skill_label.name = "SkillLabel"
 	_skill_label.position = Vector3(0.0, radius + 0.62, 0.0)
 	_skill_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_skill_label.font_size = 58
-	_skill_label.outline_size = 12
-	_skill_label.modulate = Color(1.0, 0.92, 0.4)
+	_skill_label.font_size = 42
+	_skill_label.outline_size = 7
+	_skill_label.modulate = Color(1.0, 0.92, 0.4, 0.78)
 	_skill_label.no_depth_test = true
 	add_child(_skill_label)
 
@@ -177,9 +177,9 @@ func _ensure_status_labels() -> void:
 	_lock_label.name = "LockLabel"
 	_lock_label.position = Vector3(0.0, radius + 1.04, 0.0)
 	_lock_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_lock_label.font_size = 52
-	_lock_label.outline_size = 12
-	_lock_label.modulate = Color(0.45, 0.82, 1.0)
+	_lock_label.font_size = 38
+	_lock_label.outline_size = 7
+	_lock_label.modulate = Color(0.45, 0.82, 1.0, 0.72)
 	_lock_label.no_depth_test = true
 	add_child(_lock_label)
 	_update_status_labels()
@@ -289,34 +289,34 @@ func _create_immune_mesh() -> CylinderMesh:
 
 func _add_aura_visuals() -> void:
 	var ring := TorusMesh.new()
-	ring.inner_radius = radius * 1.72
-	ring.outer_radius = radius * 2.08
-	ring.rings = 48
-	ring.ring_segments = 12
-	var ring_instance := _add_skill_mesh("AuraRing", ring, _create_glow_material(Color(0.2, 0.72, 1.0, 0.86)))
+	ring.inner_radius = radius * 1.42
+	ring.outer_radius = radius * 1.58
+	ring.rings = 36
+	ring.ring_segments = 8
+	var ring_instance := _add_skill_mesh("AuraRing", ring, _create_glow_material(Color(0.38, 0.86, 1.0, 0.34)))
 	ring_instance.position.y = -radius + 0.05
 
 	var particles := GPUParticles3D.new()
 	particles.name = "FrostParticles"
-	particles.amount = 38
-	particles.lifetime = 1.9
-	particles.randomness = 0.55
-	particles.visibility_aabb = AABB(Vector3(-1.2, -0.5, -1.2), Vector3(2.4, 2.0, 2.4))
+	particles.amount = 14
+	particles.lifetime = 1.25
+	particles.randomness = 0.42
+	particles.visibility_aabb = AABB(Vector3(-0.75, -0.35, -0.75), Vector3(1.5, 1.35, 1.5))
 	var process_material := ParticleProcessMaterial.new()
 	process_material.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
-	process_material.emission_sphere_radius = radius * 2.25
+	process_material.emission_sphere_radius = radius * 1.36
 	process_material.direction = Vector3.UP
 	process_material.spread = 180.0
-	process_material.initial_velocity_min = 0.08
-	process_material.initial_velocity_max = 0.28
+	process_material.initial_velocity_min = 0.04
+	process_material.initial_velocity_max = 0.14
 	process_material.gravity = Vector3(0.0, 0.1, 0.0)
-	process_material.scale_min = 0.35
-	process_material.scale_max = 0.82
-	process_material.color = Color(0.55, 0.9, 1.0, 0.78)
+	process_material.scale_min = 0.18
+	process_material.scale_max = 0.38
+	process_material.color = Color(0.66, 0.96, 1.0, 0.34)
 	particles.process_material = process_material
 	var quad := QuadMesh.new()
-	quad.size = Vector2(0.19, 0.19)
-	quad.material = _create_glow_material(Color(0.64, 0.94, 1.0, 0.82), true)
+	quad.size = Vector2(0.1, 0.1)
+	quad.material = _create_glow_material(Color(0.70, 0.98, 1.0, 0.28), true)
 	particles.draw_pass_1 = quad
 	_skill_visual_root.add_child(particles)
 
@@ -324,29 +324,29 @@ func _add_aura_visuals() -> void:
 func _add_dash_visuals() -> void:
 	var arrow := CylinderMesh.new()
 	arrow.top_radius = 0.0
-	arrow.bottom_radius = radius * 0.72
-	arrow.height = radius * 0.94
+	arrow.bottom_radius = radius * 0.54
+	arrow.height = radius * 0.76
 	arrow.radial_segments = 6
-	var arrow_instance := _add_skill_mesh("DashArrow", arrow, _create_glow_material(Color(1.0, 0.56, 0.12, 0.95)))
+	var arrow_instance := _add_skill_mesh("DashArrow", arrow, _create_glow_material(Color(1.0, 0.68, 0.24, 0.42)))
 	arrow_instance.position.y = radius * 1.68
 
-	for height_offset in [-0.34, 0.18]:
+	for height_offset in [-0.26, 0.12]:
 		var ring := TorusMesh.new()
-		ring.inner_radius = radius * 1.08
-		ring.outer_radius = radius * 1.34
-		ring.rings = 32
-		ring.ring_segments = 8
-		var ring_instance := _add_skill_mesh("DashRing", ring, _create_glow_material(Color(1.0, 0.66, 0.2, 0.78)))
+		ring.inner_radius = radius * 0.92
+		ring.outer_radius = radius * 1.08
+		ring.rings = 28
+		ring.ring_segments = 6
+		var ring_instance := _add_skill_mesh("DashRing", ring, _create_glow_material(Color(1.0, 0.76, 0.35, 0.30)))
 		ring_instance.position.y = height_offset
 
 
 func _add_immune_visuals() -> void:
 	var guard := CylinderMesh.new()
-	guard.top_radius = radius * 1.46
-	guard.bottom_radius = radius * 1.46
-	guard.height = 0.11
+	guard.top_radius = radius * 1.18
+	guard.bottom_radius = radius * 1.18
+	guard.height = 0.075
 	guard.radial_segments = 6
-	var guard_instance := _add_skill_mesh("ImmuneGuard", guard, _create_glow_material(Color(0.62, 0.92, 1.0, 0.88)))
+	var guard_instance := _add_skill_mesh("ImmuneGuard", guard, _create_glow_material(Color(0.74, 0.96, 1.0, 0.34)))
 	guard_instance.position.y = -radius + 0.07
 
 
@@ -366,7 +366,7 @@ func _create_glow_material(color: Color, billboard := false) -> StandardMaterial
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.emission_enabled = true
 	material.emission = Color(color.r, color.g, color.b)
-	material.emission_energy_multiplier = 1.8
+	material.emission_energy_multiplier = 0.72
 	if billboard:
 		material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	return material
@@ -377,13 +377,13 @@ func _update_status_labels() -> void:
 		match passive_skill_id:
 			"immobilize_aura":
 				_skill_label.text = "AURA"
-				_skill_label.modulate = Color(0.45, 0.88, 1.0)
+				_skill_label.modulate = Color(0.45, 0.88, 1.0, 0.72)
 			"dash_jump":
 				_skill_label.text = "JUMP"
-				_skill_label.modulate = Color(1.0, 0.68, 0.22)
+				_skill_label.modulate = Color(1.0, 0.72, 0.28, 0.72)
 			"freeze_immune":
 				_skill_label.text = "ICE"
-				_skill_label.modulate = Color(0.7, 0.96, 1.0)
+				_skill_label.modulate = Color(0.7, 0.96, 1.0, 0.72)
 			_:
 				_skill_label.text = ""
 	if _lock_label != null:

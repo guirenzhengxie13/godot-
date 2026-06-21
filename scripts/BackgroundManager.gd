@@ -31,21 +31,24 @@ signal render_cost_profile_changed(profile: Dictionary)
 
 @export_group("Inner Board Lamps")
 @export var inner_lamps_enabled := true
-@export var inner_lamp_outset := 0.95
+@export var inner_lamp_outset := 1.35
 @export var inner_lamp_height := 2.4
 @export var inner_lamp_light_height := 2.15
 @export var inner_lamp_pole_radius := 0.045
 @export var inner_lamp_pole_color := Color(0.18, 0.14, 0.10)
 @export var inner_lamp_shade_color := Color(0.12, 0.09, 0.06)
 @export var inner_lamp_bulb_radius := 0.105
-@export var inner_lamp_energy := 2.8
-@export var inner_lamp_range := 10.0
-@export var inner_lamp_spot_angle := 62.0
-@export var inner_lamp_spot_attenuation := 0.75
+@export var inner_lamp_energy := 0.95
+@export var inner_lamp_range := 6.2
+@export var inner_lamp_spot_angle := 36.0
+@export var inner_lamp_spot_attenuation := 1.65
 @export var inner_lamp_color := Color(1.0, 0.76, 0.46)
-@export var inner_lamp_aim_center_blend := 0.55
+@export var inner_lamp_aim_center_blend := 0.22
 @export var inner_lamp_aim_height := 0.06
 @export var inner_lamp_debug_markers := false
+
+@export_group("Board Glow")
+@export var board_glow_spots_enabled := false
 
 const KENNEY_PROP_ROOT := "res://assets/environment/kenney_nature"
 const KENNEY_LANDMARK_ROOT := "res://assets/environment/kenney_landmarks"
@@ -704,6 +707,8 @@ func _build_board_accent_lights() -> void:
 
 func _build_board_glow_spots() -> void:
 	_board_glow_spots.clear()
+	if not board_glow_spots_enabled:
+		return
 	var placements := [
 		{"pos": Vector3(-4.8, 0.0, -2.7), "radius": 0.26, "scale": 0.85, "color": Color(0.72, 0.86, 1.0, 0.2)},
 		{"pos": Vector3(-2.7, 0.0, -3.9), "radius": 0.18, "scale": 0.55, "color": Color(1.0, 0.86, 0.58, 0.16)},
@@ -1541,7 +1546,7 @@ func _refresh_inner_board_lamps() -> void:
 		return
 	var scale := _get_final_lighting_value("inner_lamp_scale", 0.0)
 	var final_energy := inner_lamp_energy * scale
-	var bulb_energy := clampf(scale * 1.8, 0.0, 2.2)
+	var bulb_energy := clampf(scale * 0.9, 0.0, 1.1)
 	for lamp in _inner_board_lamps:
 		if is_instance_valid(lamp):
 			lamp.visible = inner_lamps_enabled

@@ -27,7 +27,7 @@ func _ready() -> void:
 
 func set_material_profile(profile: Dictionary, fallback_color: Color) -> void:
 	_material_profile = profile.duplicate(true)
-	base_color = fallback_color
+	base_color = _get_profile_color("base_color", fallback_color)
 	_apply_material_profile()
 
 
@@ -170,12 +170,19 @@ func _apply_material_profile() -> void:
 	_material.albedo_texture = load(color_path) if not color_path.is_empty() else null
 	_material.normal_enabled = not normal_path.is_empty()
 	_material.normal_texture = load(normal_path) if not normal_path.is_empty() else null
-	_material.normal_scale = 0.18
+	_material.normal_scale = clampf(float(_material_profile.get("normal_scale", 0.18)), 0.0, 1.0)
 	_material.roughness_texture = load(roughness_path) if not roughness_path.is_empty() else null
 	_material.roughness = float(_material_profile.get("roughness", 0.58))
 	_material.metallic = 0.0
 	_apply_base_material_profile()
 	_update_material_state()
+
+
+func _get_profile_color(key: String, fallback: Color) -> Color:
+	var value = _material_profile.get(key, fallback)
+	if value is Color:
+		return value
+	return fallback
 
 
 func _apply_base_material_profile() -> void:
