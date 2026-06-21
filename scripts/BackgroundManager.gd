@@ -178,7 +178,7 @@ const TIME_OF_DAY_KEYFRAMES := [
 		"sky_horizon": Color(0.05, 0.07, 0.12),
 		"floor_tint": Color(0.22, 0.34, 0.22),
 		"board_glow_energy": 0.22,
-		"marker_glow_energy": 1.2,
+		"marker_glow_energy": 1.7,
 		"firefly_energy": 1.0,
 		"mood_light_scale": 1.0,
 		"forest_rim_scale": 0.85,
@@ -293,7 +293,7 @@ const TIME_OF_DAY_KEYFRAMES := [
 		"sky_horizon": Color(0.04, 0.06, 0.12),
 		"floor_tint": Color(0.20, 0.32, 0.22),
 		"board_glow_energy": 0.24,
-		"marker_glow_energy": 1.25,
+		"marker_glow_energy": 1.9,
 		"firefly_energy": 1.0,
 		"mood_light_scale": 1.0,
 		"forest_rim_scale": 0.85,
@@ -1364,7 +1364,7 @@ func _get_lighting_limits() -> Dictionary:
 		"mood_light_scale": Vector2(0.0, 1.2),
 		"firefly_energy": Vector2(0.0, 1.2),
 		"board_glow_energy": Vector2(0.0, 0.5),
-		"marker_glow_energy": Vector2(0.0, 2.2),
+		"marker_glow_energy": Vector2(0.0, 3.0),
 	}
 
 
@@ -1744,7 +1744,6 @@ func _build_cover_meadow_layout() -> void:
 	var layout_root := Node3D.new()
 	layout_root.name = "CoverMeadowLayout"
 	_props_root.add_child(layout_root)
-	_add_cover_meadow_ground_patches(layout_root)
 
 	for index in range(COVER_MEADOW_PROP_POINTS.size()):
 		var point: Dictionary = COVER_MEADOW_PROP_POINTS[index]
@@ -2209,38 +2208,7 @@ func _build_grass_detail_ring() -> void:
 
 
 func _build_canopy_shadow_layer() -> void:
-	var root := Node3D.new()
-	root.name = "CanopyShade"
-	_props_root.add_child(root)
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.04, 0.12, 0.055, 0.28)
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.roughness = 1.0
-	material.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	var placements := [
-		{"pos": Vector3(-9.4, 0.035, -5.8), "scale": Vector3(5.8, 1.0, 2.7), "rot": -18.0},
-		{"pos": Vector3(8.8, 0.035, -5.2), "scale": Vector3(5.2, 1.0, 2.4), "rot": 22.0},
-		{"pos": Vector3(-8.6, 0.035, 6.6), "scale": Vector3(5.6, 1.0, 2.5), "rot": 24.0},
-		{"pos": Vector3(9.2, 0.035, 6.2), "scale": Vector3(4.8, 1.0, 2.25), "rot": -28.0},
-		{"pos": Vector3(0.0, 0.035, -10.4), "scale": Vector3(6.2, 1.0, 2.2), "rot": 4.0},
-		{"pos": Vector3(0.0, 0.035, 10.8), "scale": Vector3(6.5, 1.0, 2.35), "rot": -6.0},
-	]
-	for index in range(placements.size()):
-		var mesh := CylinderMesh.new()
-		mesh.top_radius = 1.0
-		mesh.bottom_radius = 1.0
-		mesh.height = 0.015
-		mesh.radial_segments = 18
-		var patch := MeshInstance3D.new()
-		patch.name = "CanopyShade_%d" % index
-		patch.mesh = mesh
-		patch.position = placements[index]["pos"]
-		patch.scale = placements[index]["scale"]
-		patch.rotation_degrees.y = float(placements[index]["rot"])
-		patch.material_override = material
-		patch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		root.add_child(patch)
+	return
 
 
 func _build_firefly_layer() -> void:

@@ -889,7 +889,7 @@ func _build_lighting_menu() -> void:
 	_build_lighting_slider(box, "曝光", "exposure", 0.6, 1.05, 0.01)
 	_build_lighting_slider(box, "接触阴影", "ssao_intensity", 0.0, 2.4, 0.02)
 	_build_lighting_slider(box, "棋盘光点", "board_glow_energy", 0.0, 0.5, 0.01)
-	_build_lighting_slider(box, "石柱发光", "marker_glow_energy", 0.0, 2.2, 0.01)
+	_build_lighting_slider(box, "石柱发光", "marker_glow_energy", 0.0, 3.0, 0.01)
 
 	_build_lighting_slider(box, "渲染精度", "render_scale", 0.6, 1.4, 0.05)
 

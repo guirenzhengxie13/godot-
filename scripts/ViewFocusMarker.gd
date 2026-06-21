@@ -32,7 +32,7 @@ func set_material_profile(profile: Dictionary, fallback_color: Color) -> void:
 
 
 func set_marker_glow(energy: float) -> void:
-	_glow_energy = clampf(energy, 0.0, 2.2)
+	_glow_energy = clampf(energy, 0.0, 3.0)
 	_update_material_state()
 
 
@@ -78,9 +78,9 @@ func _build_glow_light() -> void:
 	_glow_light = OmniLight3D.new()
 	_glow_light.name = "MarkerGlowLight"
 	_glow_light.position = Vector3(0.0, 0.95, 0.0)
-	_glow_light.light_color = base_color.lightened(0.45)
+	_glow_light.light_color = _get_balanced_glow_color(base_color)
 	_glow_light.light_energy = 0.0
-	_glow_light.omni_range = 8.8
+	_glow_light.omni_range = 12.0
 	_glow_light.shadow_enabled = false
 	_set_property_if_available(_glow_light, "light_specular", 0.02)
 	add_child(_glow_light)
@@ -208,19 +208,31 @@ func _update_material_state() -> void:
 	else:
 		_material.albedo_color = Color(1.08, 1.08, 1.08) if _is_hovered else Color.WHITE
 
-	var glow_color := hover_color if _is_hovered else base_color.lightened(0.3)
+	var glow_color := hover_color if _is_hovered else _get_balanced_glow_color(base_color)
 	var glow_energy := maxf(_glow_energy, 0.7) if _is_hovered else _glow_energy
 	_material.emission_enabled = glow_energy > 0.01
 	_material.emission = glow_color
-	_material.emission_energy_multiplier = glow_energy * 0.42
+	_material.emission_energy_multiplier = glow_energy * 0.72
 	if _base_material != null:
 		_base_material.emission_enabled = glow_energy > 0.01
-		_base_material.emission = base_color.lightened(0.2)
-		_base_material.emission_energy_multiplier = glow_energy * 0.28
+		_base_material.emission = glow_color
+		_base_material.emission_energy_multiplier = glow_energy * 0.48
 	if _glow_light != null:
 		_glow_light.light_color = glow_color
-		_glow_light.omni_range = 8.8
-		_glow_light.light_energy = glow_energy * 0.72
+		_glow_light.omni_range = 12.0
+		_glow_light.light_energy = glow_energy * 1.35
+
+
+func _get_balanced_glow_color(color: Color) -> Color:
+	var vivid := color.lerp(Color.WHITE, 0.28)
+	var luminance := maxf(vivid.r * 0.2126 + vivid.g * 0.7152 + vivid.b * 0.0722, 0.22)
+	var boost := clampf(0.86 / luminance, 1.0, 2.4)
+	return Color(
+		clampf(vivid.r * boost, 0.0, 1.0),
+		clampf(vivid.g * boost, 0.0, 1.0),
+		clampf(vivid.b * boost, 0.0, 1.0),
+		1.0
+	)
 
 
 func _set_property_if_available(object: Object, property_name: String, value) -> void:
