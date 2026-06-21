@@ -299,17 +299,29 @@ func apply_board_material(material_id: String) -> void:
 			cell.set_material_profile(profile)
 
 
-func apply_player_material(player_id: int, material_id: String) -> void:
+func apply_player_material(player_id: int, material_id: String) -> bool:
+	if _is_player_material_locked(player_id, material_id):
+		return false
 	_player_material_ids[player_id] = material_id
 	var profile := _get_material_profile(material_id)
 	for piece in pieces.values():
 		if piece != null and piece.player_id == player_id and piece.has_method("set_material_profile"):
 			piece.set_material_profile(profile)
 	player_material_changed.emit(player_id, profile.duplicate(true))
+	return true
 
 
 func get_player_material_profile(player_id: int) -> Dictionary:
 	return _get_material_profile(_player_material_ids.get(player_id, "default"))
+
+
+func _is_player_material_locked(player_id: int, material_id: String) -> bool:
+	for other_player_id in _player_material_ids.keys():
+		if int(other_player_id) == player_id:
+			continue
+		if String(_player_material_ids.get(other_player_id, "")) == material_id:
+			return true
+	return false
 
 
 func highlight_selection(piece, legal_targets: Array[Vector2i]) -> void:

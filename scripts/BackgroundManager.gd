@@ -38,12 +38,12 @@ signal render_cost_profile_changed(profile: Dictionary)
 @export var inner_lamp_pole_color := Color(0.18, 0.14, 0.10)
 @export var inner_lamp_shade_color := Color(0.12, 0.09, 0.06)
 @export var inner_lamp_bulb_radius := 0.105
-@export var inner_lamp_energy := 0.42
-@export var inner_lamp_range := 5.8
-@export var inner_lamp_spot_angle := 36.0
-@export var inner_lamp_spot_attenuation := 2.4
+@export var inner_lamp_energy := 2.8
+@export var inner_lamp_range := 10.0
+@export var inner_lamp_spot_angle := 62.0
+@export var inner_lamp_spot_attenuation := 0.75
 @export var inner_lamp_color := Color(1.0, 0.76, 0.46)
-@export var inner_lamp_aim_center_blend := 0.22
+@export var inner_lamp_aim_center_blend := 0.55
 @export var inner_lamp_aim_height := 0.06
 @export var inner_lamp_debug_markers := false
 
@@ -178,7 +178,7 @@ const TIME_OF_DAY_KEYFRAMES := [
 		"sky_horizon": Color(0.05, 0.07, 0.12),
 		"floor_tint": Color(0.22, 0.34, 0.22),
 		"board_glow_energy": 0.22,
-		"marker_glow_energy": 0.95,
+		"marker_glow_energy": 1.2,
 		"firefly_energy": 1.0,
 		"mood_light_scale": 1.0,
 		"forest_rim_scale": 0.85,
@@ -293,7 +293,7 @@ const TIME_OF_DAY_KEYFRAMES := [
 		"sky_horizon": Color(0.04, 0.06, 0.12),
 		"floor_tint": Color(0.20, 0.32, 0.22),
 		"board_glow_energy": 0.24,
-		"marker_glow_energy": 1.0,
+		"marker_glow_energy": 1.25,
 		"firefly_energy": 1.0,
 		"mood_light_scale": 1.0,
 		"forest_rim_scale": 0.85,
@@ -566,7 +566,7 @@ var _time_lighting_settings: Dictionary = {}
 var _board_manager: Node = null
 var _inner_lamps_root: Node3D
 var _inner_board_lamps: Array[Node3D] = []
-var _inner_lamp_lights: Array[OmniLight3D] = []
+var _inner_lamp_lights: Array[SpotLight3D] = []
 var _inner_lamp_bulbs: Array[MeshInstance3D] = []
 var _inner_lamp_debug_lines: Array[MeshInstance3D] = []
 
@@ -916,13 +916,14 @@ func _create_inner_board_lamp(index: int, local_position: Vector3, outward: Vect
 	lamp.add_child(bulb)
 	_inner_lamp_bulbs.append(bulb)
 
-	var light := OmniLight3D.new()
+	var light := SpotLight3D.new()
 	light.name = "LampLight"
 	light.position = bulb.position
 	light.light_color = inner_lamp_color
 	light.light_energy = 0.0
-	light.omni_range = inner_lamp_range
-	light.omni_attenuation = inner_lamp_spot_attenuation
+	light.spot_range = inner_lamp_range
+	light.spot_angle = inner_lamp_spot_angle
+	light.spot_attenuation = inner_lamp_spot_attenuation
 	light.shadow_enabled = false
 	light.set_meta("light_group", "inner_lamp")
 	light.set_meta("priority", index)
@@ -933,10 +934,8 @@ func _create_inner_board_lamp(index: int, local_position: Vector3, outward: Vect
 
 
 func _aim_inner_lamp_light(lamp: Node3D) -> void:
-	var light := lamp.get_node_or_null("LampLight") as Light3D
+	var light := lamp.get_node_or_null("LampLight") as SpotLight3D
 	if light == null:
-		return
-	if not (light is SpotLight3D):
 		return
 	var aim_value = lamp.get_meta("lamp_aim_world", Vector3(0.0, inner_lamp_aim_height, 0.0))
 	var aim_world: Vector3 = aim_value if aim_value is Vector3 else Vector3(0.0, inner_lamp_aim_height, 0.0)
@@ -1365,7 +1364,7 @@ func _get_lighting_limits() -> Dictionary:
 		"mood_light_scale": Vector2(0.0, 1.2),
 		"firefly_energy": Vector2(0.0, 1.2),
 		"board_glow_energy": Vector2(0.0, 0.5),
-		"marker_glow_energy": Vector2(0.0, 1.6),
+		"marker_glow_energy": Vector2(0.0, 2.2),
 	}
 
 
@@ -1547,7 +1546,7 @@ func _refresh_inner_board_lamps() -> void:
 		return
 	var scale := _get_final_lighting_value("inner_lamp_scale", 0.0)
 	var final_energy := inner_lamp_energy * scale
-	var bulb_energy := clampf(scale * 0.9, 0.0, 1.1)
+	var bulb_energy := clampf(scale * 1.8, 0.0, 2.2)
 	for lamp in _inner_board_lamps:
 		if is_instance_valid(lamp):
 			lamp.visible = inner_lamps_enabled
@@ -1564,8 +1563,9 @@ func _refresh_inner_board_lamps() -> void:
 		if not is_instance_valid(light):
 			continue
 		light.light_color = inner_lamp_color
-		light.omni_range = inner_lamp_range
-		light.omni_attenuation = inner_lamp_spot_attenuation
+		light.spot_range = inner_lamp_range
+		light.spot_angle = inner_lamp_spot_angle
+		light.spot_attenuation = inner_lamp_spot_attenuation
 		light.shadow_enabled = false
 		light.light_energy = final_energy if inner_lamps_enabled else 0.0
 
@@ -1633,7 +1633,7 @@ func _apply_mood_light_budget(mood_count: int, garden_count: int) -> void:
 		light.visible = enabled
 
 
-func _apply_light_budget_to_lamps(lights: Array[OmniLight3D], active_count: int) -> void:
+func _apply_light_budget_to_lamps(lights: Array[SpotLight3D], active_count: int) -> void:
 	for index in range(lights.size()):
 		var light := lights[index]
 		if not is_instance_valid(light):

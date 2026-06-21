@@ -289,9 +289,9 @@ func set_analysis_status(status: String) -> void:
 
 func set_material_options(options: Array[Dictionary]) -> void:
 	_material_options = options.duplicate(true)
-	_populate_material_option(_board_material_option, "board", String(_material_selection.get("board", "default")))
-	_populate_material_option(_player_one_material_option, "player", String(_material_selection.get("player_1", "default")))
-	_populate_material_option(_player_two_material_option, "player", String(_material_selection.get("player_2", "default")))
+	_populate_material_option(_board_material_option, "board", String(_material_selection.get("board", "default")), "board")
+	_populate_material_option(_player_one_material_option, "player", String(_material_selection.get("player_1", "default")), "player_1")
+	_populate_material_option(_player_two_material_option, "player", String(_material_selection.get("player_2", "default")), "player_2")
 
 
 func set_material_selection(selection: Dictionary) -> void:
@@ -299,6 +299,7 @@ func set_material_selection(selection: Dictionary) -> void:
 	_select_material_option(_board_material_option, String(_material_selection.get("board", "default")))
 	_select_material_option(_player_one_material_option, String(_material_selection.get("player_1", "default")))
 	_select_material_option(_player_two_material_option, String(_material_selection.get("player_2", "default")))
+	_refresh_player_material_locks()
 
 
 func set_lighting_presets(options: Array[Dictionary]) -> void:
@@ -748,9 +749,9 @@ func _build_pause_menu() -> void:
 	_board_material_option = _build_material_option_row(box, "棋盘", "board")
 	_player_one_material_option = _build_material_option_row(box, "玩家 1 棋子", "player_1")
 	_player_two_material_option = _build_material_option_row(box, "玩家 2 棋子", "player_2")
-	_populate_material_option(_board_material_option, "board", String(_material_selection.get("board", "default")))
-	_populate_material_option(_player_one_material_option, "player", String(_material_selection.get("player_1", "default")))
-	_populate_material_option(_player_two_material_option, "player", String(_material_selection.get("player_2", "default")))
+	_populate_material_option(_board_material_option, "board", String(_material_selection.get("board", "default")), "board")
+	_populate_material_option(_player_one_material_option, "player", String(_material_selection.get("player_1", "default")), "player_1")
+	_populate_material_option(_player_two_material_option, "player", String(_material_selection.get("player_2", "default")), "player_2")
 
 	var lighting_button := Button.new()
 	lighting_button.text = "光影设置"
@@ -888,7 +889,7 @@ func _build_lighting_menu() -> void:
 	_build_lighting_slider(box, "曝光", "exposure", 0.6, 1.05, 0.01)
 	_build_lighting_slider(box, "接触阴影", "ssao_intensity", 0.0, 2.4, 0.02)
 	_build_lighting_slider(box, "棋盘光点", "board_glow_energy", 0.0, 0.5, 0.01)
-	_build_lighting_slider(box, "石柱发光", "marker_glow_energy", 0.0, 1.6, 0.01)
+	_build_lighting_slider(box, "石柱发光", "marker_glow_energy", 0.0, 2.2, 0.01)
 
 	_build_lighting_slider(box, "渲染精度", "render_scale", 0.6, 1.4, 0.05)
 
@@ -1150,7 +1151,7 @@ func _build_material_option_row(parent: VBoxContainer, label_text: String, targe
 	return option
 
 
-func _populate_material_option(option: OptionButton, target_usage := "", selected_id := "default") -> void:
+func _populate_material_option(option: OptionButton, target_usage := "", selected_id := "default", target := "") -> void:
 	if option == null:
 		return
 
@@ -1161,10 +1162,13 @@ func _populate_material_option(option: OptionButton, target_usage := "", selecte
 			continue
 		option.add_item(String(material_option.get("label", "材质 %d" % index)))
 		option.set_item_metadata(option.item_count - 1, String(material_option.get("id", "default")))
+		option.set_item_disabled(option.item_count - 1, _is_material_locked_for_target(target, String(material_option.get("id", "default"))))
 	if option.item_count == 0:
 		option.add_item("默认颜色")
 		option.set_item_metadata(0, "default")
+		option.set_item_disabled(0, _is_material_locked_for_target(target, "default"))
 	_select_material_option(option, selected_id)
+	_refresh_player_material_locks()
 
 
 func _material_option_matches_usage(option: Dictionary, target_usage: String) -> bool:
@@ -1185,6 +1189,29 @@ func _select_material_option(option: OptionButton, material_id: String) -> void:
 			option.select(index)
 			return
 	option.select(0)
+
+
+func _refresh_player_material_locks() -> void:
+	_refresh_material_option_locks(_player_one_material_option, "player_1")
+	_refresh_material_option_locks(_player_two_material_option, "player_2")
+
+
+func _refresh_material_option_locks(option: OptionButton, target: String) -> void:
+	if option == null:
+		return
+	for index in range(option.item_count):
+		var material_id := String(option.get_item_metadata(index))
+		option.set_item_disabled(index, _is_material_locked_for_target(target, material_id))
+
+
+func _is_material_locked_for_target(target: String, material_id: String) -> bool:
+	match target:
+		"player_1":
+			return material_id == String(_material_selection.get("player_2", ""))
+		"player_2":
+			return material_id == String(_material_selection.get("player_1", ""))
+		_:
+			return false
 
 
 func _on_start_local_pressed() -> void:
@@ -1312,6 +1339,9 @@ func _on_replay_slider_changed(value: float) -> void:
 
 func _on_material_option_selected(option: OptionButton, target: String, index: int) -> void:
 	if option == null or index < 0:
+		return
+	if option.is_item_disabled(index):
+		_select_material_option(option, String(_material_selection.get(target, "default")))
 		return
 	material_selected.emit(target, String(option.get_item_metadata(index)))
 

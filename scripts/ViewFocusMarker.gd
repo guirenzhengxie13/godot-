@@ -32,7 +32,7 @@ func set_material_profile(profile: Dictionary, fallback_color: Color) -> void:
 
 
 func set_marker_glow(energy: float) -> void:
-	_glow_energy = clampf(energy, 0.0, 1.6)
+	_glow_energy = clampf(energy, 0.0, 2.2)
 	_update_material_state()
 
 
@@ -80,7 +80,7 @@ func _build_glow_light() -> void:
 	_glow_light.position = Vector3(0.0, 0.95, 0.0)
 	_glow_light.light_color = base_color.lightened(0.45)
 	_glow_light.light_energy = 0.0
-	_glow_light.omni_range = 7.4
+	_glow_light.omni_range = 8.8
 	_glow_light.shadow_enabled = false
 	_set_property_if_available(_glow_light, "light_specular", 0.02)
 	add_child(_glow_light)
@@ -219,7 +219,8 @@ func _update_material_state() -> void:
 		_base_material.emission_energy_multiplier = glow_energy * 0.28
 	if _glow_light != null:
 		_glow_light.light_color = glow_color
-		_glow_light.light_energy = glow_energy * 0.34
+		_glow_light.omni_range = 8.8
+		_glow_light.light_energy = glow_energy * 0.72
 
 
 func _set_property_if_available(object: Object, property_name: String, value) -> void:
