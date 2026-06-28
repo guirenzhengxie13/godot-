@@ -1930,20 +1930,23 @@ func _build_imported_environment_assets() -> void:
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 20260628
+	var reserved_zones := _get_mushroom_reserved_zones()
+	var mushroom_positions: Array[Vector3] = []
 	var mushroom_resource = load("%s/lowpoly_mushrooms.glb" % IMPORTED_MUSHROOM_ROOT) if ResourceLoader.exists("%s/lowpoly_mushrooms.glb" % IMPORTED_MUSHROOM_ROOT) else null
 	if mushroom_resource is PackedScene:
 		var mushroom_source := (mushroom_resource as PackedScene).instantiate()
 		var mushroom_variants := _find_descendant_by_name(mushroom_source, "RootNode")
 		if mushroom_variants != null:
 			for index in range(24):
-				var position := _get_random_environment_position(rng, 10.8, 23.0)
+				var position := _get_random_clear_environment_position(rng, 12.4, 16.6, reserved_zones, mushroom_positions)
+				mushroom_positions.append(position)
 				_spawn_single_imported_mushroom(
 					imported_root,
 					mushroom_variants,
 					"ImportedMushroom_%02d" % index,
 					position,
 					rng.randf_range(-180.0, 180.0),
-					rng.randf_range(0.55, 0.95),
+					rng.randf_range(0.0058, 0.0094),
 					rng.randi_range(0, mushroom_variants.get_child_count() - 1)
 				)
 		mushroom_source.free()
@@ -1966,13 +1969,60 @@ func _spawn_single_imported_mushroom(parent: Node3D, mushroom_variants: Node, no
 
 	selected.name = "%s_Model" % node_name
 	selected.position = Vector3.ZERO
-	selected.rotation = Vector3.ZERO
-	selected.scale = Vector3.ONE
 	wrapper.add_child(selected)
 	_set_prop_shadow_mode(selected, false)
 	var bounds := _get_node_global_bounds(selected)
 	if bounds.size.length_squared() > 0.0:
 		wrapper.global_position.y -= bounds.position.y
+
+
+func _get_random_clear_environment_position(rng: RandomNumberGenerator, min_radius: float, max_radius: float, reserved_zones: Array, placed_positions: Array[Vector3]) -> Vector3:
+	for _attempt in range(180):
+		var position := _get_random_environment_position(rng, min_radius, max_radius)
+		if _is_clear_mushroom_position(position, reserved_zones, placed_positions):
+			return position
+	return _get_random_environment_position(rng, min_radius, max_radius)
+
+
+func _is_clear_mushroom_position(position: Vector3, reserved_zones: Array, placed_positions: Array[Vector3]) -> bool:
+	var flat_position := Vector2(position.x, position.z)
+	for zone in reserved_zones:
+		if not zone is Dictionary:
+			continue
+		var center: Vector2 = zone.get("center", Vector2.ZERO)
+		var radius := float(zone.get("radius", 0.0))
+		if flat_position.distance_to(center) < radius:
+			return false
+	for placed in placed_positions:
+		if Vector2(placed.x, placed.z).distance_to(flat_position) < 1.25:
+			return false
+	return true
+
+
+func _get_mushroom_reserved_zones() -> Array:
+	return [
+		{"center": Vector2(-18.2, 13.4), "radius": 5.8},
+		{"center": Vector2(-17.0, -11.0), "radius": 4.2},
+		{"center": Vector2(-20.0, 5.5), "radius": 4.0},
+		{"center": Vector2(18.0, -8.5), "radius": 4.5},
+		{"center": Vector2(20.5, 7.0), "radius": 4.0},
+		{"center": Vector2(-12.8, 5.8), "radius": 4.3},
+		{"center": Vector2(-12.2, -6.8), "radius": 3.9},
+		{"center": Vector2(-5.4, -12.2), "radius": 4.0},
+		{"center": Vector2(8.8, -10.2), "radius": 3.2},
+		{"center": Vector2(12.4, 3.8), "radius": 3.3},
+		{"center": Vector2(-10.7, 10.1), "radius": 2.8},
+		{"center": Vector2(3.6, 12.6), "radius": 2.8},
+		{"center": Vector2(-11.8, 0.2), "radius": 2.8},
+		{"center": Vector2(12.6, -2.6), "radius": 2.8},
+		{"center": Vector2(-10.1, -8.7), "radius": 4.2},
+		{"center": Vector2(10.1, -8.8), "radius": 4.0},
+		{"center": Vector2(10.0, 9.0), "radius": 4.0},
+		{"center": Vector2(-10.0, 9.0), "radius": 4.0},
+		{"center": Vector2(-14.0, 13.0), "radius": 2.4},
+		{"center": Vector2(14.5, 12.5), "radius": 2.4},
+		{"center": Vector2(7.5, 17.5), "radius": 2.0},
+	]
 
 
 func _get_random_environment_position(rng: RandomNumberGenerator, min_radius: float, max_radius: float) -> Vector3:
