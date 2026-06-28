@@ -1928,21 +1928,64 @@ func _build_imported_environment_assets() -> void:
 		"cast_shadow": false,
 	}, imported_root)
 
-	var mushroom_placements := [
-		{"name": "ImportedMushrooms_SW", "pos": Vector3(-8.7, -0.23, 12.2), "rot": 18.0, "scale": 0.0085},
-		{"name": "ImportedMushrooms_SE", "pos": Vector3(8.6, -0.23, 11.1), "rot": -34.0, "scale": 0.0075},
-		{"name": "ImportedMushrooms_E", "pos": Vector3(12.2, -0.23, -5.4), "rot": 64.0, "scale": 0.0065},
-	]
-	for placement in mushroom_placements:
-		_spawn_prop_from_root(IMPORTED_MUSHROOM_ROOT, {
-			"name": placement["name"],
-			"asset": "lowpoly_mushrooms.glb",
-			"pos": placement["pos"],
-			"rot": placement["rot"],
-			"scale": placement["scale"],
-			"preserve_material": true,
-			"cast_shadow": false,
-		}, imported_root)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20260628
+	for index in range(24):
+		var position := _get_random_environment_position(rng, 10.8, 23.0)
+		_spawn_single_imported_mushroom(
+			imported_root,
+			"ImportedMushroom_%02d" % index,
+			position + Vector3(0.0, -0.23, 0.0),
+			rng.randf_range(-180.0, 180.0),
+			rng.randf_range(0.010, 0.017),
+			rng.randi_range(0, 15)
+		)
+
+
+func _spawn_single_imported_mushroom(parent: Node3D, node_name: String, position: Vector3, rotation_y: float, scale_value: float, variant_index: int) -> void:
+	var path := "%s/lowpoly_mushrooms.glb" % IMPORTED_MUSHROOM_ROOT
+	var resource = load(path) if ResourceLoader.exists(path) else null
+	if not resource is PackedScene:
+		return
+	var source_root := (resource as PackedScene).instantiate()
+	var mushroom_root := _find_descendant_by_name(source_root, "RootNode")
+	if mushroom_root == null or mushroom_root.get_child_count() == 0:
+		source_root.free()
+		return
+	var selected_index := posmod(variant_index, mushroom_root.get_child_count())
+	var selected := mushroom_root.get_child(selected_index) as Node3D
+	mushroom_root.remove_child(selected)
+	source_root.free()
+
+	var wrapper := Node3D.new()
+	wrapper.name = node_name
+	wrapper.position = position
+	wrapper.rotation_degrees.y = rotation_y
+	wrapper.scale = Vector3.ONE * scale_value
+	parent.add_child(wrapper)
+
+	selected.name = "%s_Model" % node_name
+	selected.position = Vector3.ZERO
+	selected.rotation = Vector3.ZERO
+	selected.scale = Vector3.ONE
+	wrapper.add_child(selected)
+	_set_prop_shadow_mode(selected, false)
+
+
+func _get_random_environment_position(rng: RandomNumberGenerator, min_radius: float, max_radius: float) -> Vector3:
+	var angle := rng.randf_range(0.0, TAU)
+	var radius := sqrt(rng.randf_range(min_radius * min_radius, max_radius * max_radius))
+	return Vector3(cos(angle) * radius, 0.0, sin(angle) * radius)
+
+
+func _find_descendant_by_name(node: Node, node_name: String) -> Node:
+	if node.name == node_name:
+		return node
+	for child in node.get_children():
+		var found := _find_descendant_by_name(child, node_name)
+		if found != null:
+			return found
+	return null
 
 
 func _build_corner_landmarks() -> void:
