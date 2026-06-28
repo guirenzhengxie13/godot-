@@ -53,6 +53,8 @@ signal render_cost_profile_changed(profile: Dictionary)
 const KENNEY_PROP_ROOT := "res://assets/environment/kenney_nature"
 const KENNEY_LANDMARK_ROOT := "res://assets/environment/kenney_landmarks"
 const DOWNLOADED_MATERIAL_ROOT := "res://assets/environment/downloaded_materials/polyhaven"
+const IMPORTED_TREE_ROOT := "res://assets/environment/imported/trees"
+const IMPORTED_MUSHROOM_ROOT := "res://assets/environment/imported/mushrooms"
 const LIGHTING_PROFILE_PATH := "user://lighting_profile.cfg"
 const RENDER_COST_PROFILE_CONFIG_PATH := "user://render_cost_profile.cfg"
 const DEFAULT_RENDER_COST_PROFILE_ID := "high"
@@ -1728,6 +1730,7 @@ func _build_scene_props() -> void:
 	for placement in placements:
 		_spawn_prop(placement)
 	_build_cover_meadow_layout()
+	_build_imported_environment_assets()
 	_build_corner_landmarks()
 	_build_board_garden_ring()
 	_build_garden_water_feature()
@@ -1908,6 +1911,38 @@ func _build_cover_meadow_shrub_cluster(parent: Node3D) -> void:
 	]
 	for placement in placements:
 		_spawn_prop_from_root(KENNEY_PROP_ROOT, placement, parent)
+
+
+func _build_imported_environment_assets() -> void:
+	var imported_root := Node3D.new()
+	imported_root.name = "ImportedEnvironmentAssets"
+	_props_root.add_child(imported_root)
+
+	_spawn_prop_from_root(IMPORTED_TREE_ROOT, {
+		"name": "ImportedTreeGrove",
+		"asset": "low_poly_tree_scene_free.glb",
+		"pos": Vector3(-18.2, -0.03, 13.4),
+		"rot": -28.0,
+		"scale": 0.76,
+		"preserve_material": true,
+		"cast_shadow": false,
+	}, imported_root)
+
+	var mushroom_placements := [
+		{"name": "ImportedMushrooms_SW", "pos": Vector3(-8.7, -0.23, 12.2), "rot": 18.0, "scale": 0.0085},
+		{"name": "ImportedMushrooms_SE", "pos": Vector3(8.6, -0.23, 11.1), "rot": -34.0, "scale": 0.0075},
+		{"name": "ImportedMushrooms_E", "pos": Vector3(12.2, -0.23, -5.4), "rot": 64.0, "scale": 0.0065},
+	]
+	for placement in mushroom_placements:
+		_spawn_prop_from_root(IMPORTED_MUSHROOM_ROOT, {
+			"name": placement["name"],
+			"asset": "lowpoly_mushrooms.glb",
+			"pos": placement["pos"],
+			"rot": placement["rot"],
+			"scale": placement["scale"],
+			"preserve_material": true,
+			"cast_shadow": false,
+		}, imported_root)
 
 
 func _build_corner_landmarks() -> void:
@@ -2261,13 +2296,14 @@ func _spawn_prop_from_root(asset_root: String, placement: Dictionary, parent: No
 	else:
 		node = _build_fallback_prop()
 
-	node.name = String(placement.get("asset", "Prop")).get_basename()
+	node.name = String(placement.get("name", String(placement.get("asset", "Prop")).get_basename()))
 	node.position = placement.get("pos", Vector3.ZERO)
 	node.rotation_degrees = Vector3(0.0, float(placement.get("rot", 0.0)), 0.0)
 	var scale_value := float(placement.get("scale", 1.0))
 	node.scale = Vector3.ONE * scale_value
 	var material_kind := String(placement.get("material", "matte"))
-	_apply_prop_material(node, placement.get("color", Color.WHITE), material_kind)
+	if not bool(placement.get("preserve_material", false)):
+		_apply_prop_material(node, placement.get("color", Color.WHITE), material_kind)
 	_set_prop_shadow_mode(node, bool(placement.get("cast_shadow", material_kind not in ["grass", "flower", "leaf", "leaf_dark"])))
 	parent.add_child(node)
 
