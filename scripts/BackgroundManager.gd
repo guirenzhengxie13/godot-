@@ -1930,32 +1930,32 @@ func _build_imported_environment_assets() -> void:
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 20260628
-	for index in range(24):
-		var position := _get_random_environment_position(rng, 10.8, 23.0)
-		_spawn_single_imported_mushroom(
-			imported_root,
-			"ImportedMushroom_%02d" % index,
-			position + Vector3(0.0, -0.23, 0.0),
-			rng.randf_range(-180.0, 180.0),
-			rng.randf_range(0.010, 0.017),
-			rng.randi_range(0, 15)
-		)
+	var mushroom_resource = load("%s/lowpoly_mushrooms.glb" % IMPORTED_MUSHROOM_ROOT) if ResourceLoader.exists("%s/lowpoly_mushrooms.glb" % IMPORTED_MUSHROOM_ROOT) else null
+	if mushroom_resource is PackedScene:
+		var mushroom_source := (mushroom_resource as PackedScene).instantiate()
+		var mushroom_variants := _find_descendant_by_name(mushroom_source, "RootNode")
+		if mushroom_variants != null:
+			for index in range(24):
+				var position := _get_random_environment_position(rng, 10.8, 23.0)
+				_spawn_single_imported_mushroom(
+					imported_root,
+					mushroom_variants,
+					"ImportedMushroom_%02d" % index,
+					position,
+					rng.randf_range(-180.0, 180.0),
+					rng.randf_range(0.55, 0.95),
+					rng.randi_range(0, mushroom_variants.get_child_count() - 1)
+				)
+		mushroom_source.free()
 
 
-func _spawn_single_imported_mushroom(parent: Node3D, node_name: String, position: Vector3, rotation_y: float, scale_value: float, variant_index: int) -> void:
-	var path := "%s/lowpoly_mushrooms.glb" % IMPORTED_MUSHROOM_ROOT
-	var resource = load(path) if ResourceLoader.exists(path) else null
-	if not resource is PackedScene:
+func _spawn_single_imported_mushroom(parent: Node3D, mushroom_variants: Node, node_name: String, position: Vector3, rotation_y: float, scale_value: float, variant_index: int) -> void:
+	if mushroom_variants == null or mushroom_variants.get_child_count() == 0:
 		return
-	var source_root := (resource as PackedScene).instantiate()
-	var mushroom_root := _find_descendant_by_name(source_root, "RootNode")
-	if mushroom_root == null or mushroom_root.get_child_count() == 0:
-		source_root.free()
+	var source_variant := mushroom_variants.get_child(posmod(variant_index, mushroom_variants.get_child_count()))
+	var selected := source_variant.duplicate() as Node3D
+	if selected == null:
 		return
-	var selected_index := posmod(variant_index, mushroom_root.get_child_count())
-	var selected := mushroom_root.get_child(selected_index) as Node3D
-	mushroom_root.remove_child(selected)
-	source_root.free()
 
 	var wrapper := Node3D.new()
 	wrapper.name = node_name
@@ -1970,6 +1970,9 @@ func _spawn_single_imported_mushroom(parent: Node3D, node_name: String, position
 	selected.scale = Vector3.ONE
 	wrapper.add_child(selected)
 	_set_prop_shadow_mode(selected, false)
+	var bounds := _get_node_global_bounds(selected)
+	if bounds.size.length_squared() > 0.0:
+		wrapper.global_position.y -= bounds.position.y
 
 
 func _get_random_environment_position(rng: RandomNumberGenerator, min_radius: float, max_radius: float) -> Vector3:
@@ -1986,6 +1989,26 @@ func _find_descendant_by_name(node: Node, node_name: String) -> Node:
 		if found != null:
 			return found
 	return null
+
+
+func _get_node_global_bounds(node: Node) -> AABB:
+	var has_bounds := false
+	var result := AABB()
+	if node is MeshInstance3D:
+		var mesh_instance := node as MeshInstance3D
+		if mesh_instance.mesh != null:
+			result = mesh_instance.global_transform * mesh_instance.mesh.get_aabb()
+			has_bounds = true
+	for child in node.get_children():
+		var child_bounds := _get_node_global_bounds(child)
+		if child_bounds.size.length_squared() <= 0.0:
+			continue
+		if has_bounds:
+			result = result.merge(child_bounds)
+		else:
+			result = child_bounds
+			has_bounds = true
+	return result
 
 
 func _build_corner_landmarks() -> void:
