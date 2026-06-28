@@ -1713,15 +1713,28 @@ func _build_scene_props() -> void:
 	add_child(_props_root)
 
 	var placements := [
-		{"asset": "grass_large.obj", "pos": Vector3(11.5, 0.0, -16.5), "rot": -12.0, "scale": 1.15, "color": Color(0.46, 0.71, 0.34), "material": "grass"},
-		{"asset": "flower_yellowA.obj", "pos": Vector3(-7.0, 0.0, 17.0), "rot": 28.0, "scale": 0.86, "color": Color(0.92, 0.76, 0.26), "material": "flower"},
-		{"asset": "log.obj", "pos": Vector3(7.5, 0.0, 17.5), "rot": -32.0, "scale": 0.9, "color": Color(0.5, 0.32, 0.19), "material": "bark"},
+		{"asset": "tree_default.obj", "pos": Vector3(-17.0, 0.0, -11.0), "rot": 18.0, "scale": 2.8, "color": Color(0.36, 0.66, 0.3), "material": "leaf", "cast_shadow": true},
+		{"asset": "tree_pineRoundA.obj", "pos": Vector3(-20.0, 0.0, 5.5), "rot": -22.0, "scale": 2.7, "color": Color(0.22, 0.52, 0.31), "material": "leaf_dark", "cast_shadow": true},
+		{"asset": "tree_fat.obj", "pos": Vector3(18.0, 0.0, -8.5), "rot": 34.0, "scale": 3.0, "color": Color(0.43, 0.65, 0.28), "material": "leaf", "cast_shadow": true},
+		{"asset": "tree_default.obj", "pos": Vector3(20.5, 0.0, 7.0), "rot": -48.0, "scale": 2.6, "color": Color(0.32, 0.62, 0.28), "material": "leaf", "cast_shadow": true},
+		{"asset": "rock_largeA.obj", "pos": Vector3(-14.0, 0.0, 13.0), "rot": 8.0, "scale": 1.6, "color": Color(0.46, 0.49, 0.45), "material": "rock"},
+		{"asset": "rock_smallA.obj", "pos": Vector3(14.5, 0.0, 12.5), "rot": 52.0, "scale": 1.7, "color": Color(0.5, 0.52, 0.48), "material": "rock"},
+		{"asset": "plant_bush.obj", "pos": Vector3(-11.0, 0.0, -16.0), "rot": 0.0, "scale": 2.2, "color": Color(0.24, 0.55, 0.25), "material": "leaf_dark"},
+		{"asset": "grass_large.obj", "pos": Vector3(11.5, 0.0, -16.5), "rot": -12.0, "scale": 1.8, "color": Color(0.46, 0.71, 0.34), "material": "grass"},
+		{"asset": "flower_yellowA.obj", "pos": Vector3(-7.0, 0.0, 17.0), "rot": 28.0, "scale": 1.4, "color": Color(0.92, 0.76, 0.26), "material": "flower"},
+		{"asset": "log.obj", "pos": Vector3(7.5, 0.0, 17.5), "rot": -32.0, "scale": 1.5, "color": Color(0.5, 0.32, 0.19), "material": "bark"},
+		{"asset": "fence_simple.obj", "pos": Vector3(-22.0, 0.0, -1.0), "rot": 90.0, "scale": 1.8, "color": Color(0.58, 0.39, 0.24), "material": "bark"},
+		{"asset": "fence_simple.obj", "pos": Vector3(22.0, 0.0, 1.5), "rot": -90.0, "scale": 1.8, "color": Color(0.58, 0.39, 0.24), "material": "bark"},
 	]
 
 	for placement in placements:
 		_spawn_prop(placement)
+	_build_cover_meadow_layout()
 	_build_imported_environment_assets()
+	_build_corner_landmarks()
 	_build_board_garden_ring()
+	_build_garden_water_feature()
+	_build_edge_tree_ring()
 	_build_forest_rim_lights()
 	_build_grass_detail_ring()
 	_build_canopy_shadow_layer()
@@ -1905,38 +1918,31 @@ func _build_imported_environment_assets() -> void:
 	imported_root.name = "ImportedEnvironmentAssets"
 	_props_root.add_child(imported_root)
 
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 20260628
+	_spawn_prop_from_root(IMPORTED_TREE_ROOT, {
+		"name": "ImportedTreeGrove",
+		"asset": "low_poly_tree_scene_free.glb",
+		"pos": Vector3(-18.2, -0.03, 13.4),
+		"rot": -28.0,
+		"scale": 0.76,
+		"preserve_material": true,
+		"cast_shadow": false,
+	}, imported_root)
 
-	for index in range(4):
-		var position := _get_random_environment_position(rng, 17.5, 27.0)
-		_spawn_prop_from_root(IMPORTED_TREE_ROOT, {
-			"name": "ImportedTreeGrove_%02d" % index,
-			"asset": "low_poly_tree_scene_free.glb",
-			"pos": position + Vector3(0.0, -0.03, 0.0),
-			"rot": rng.randf_range(-180.0, 180.0),
-			"scale": rng.randf_range(0.38, 0.62),
-			"preserve_material": true,
-			"cast_shadow": false,
-		}, imported_root)
-
-	for index in range(18):
-		var position := _get_random_environment_position(rng, 10.8, 23.0)
+	var mushroom_placements := [
+		{"name": "ImportedMushrooms_SW", "pos": Vector3(-8.7, -0.23, 12.2), "rot": 18.0, "scale": 0.0085},
+		{"name": "ImportedMushrooms_SE", "pos": Vector3(8.6, -0.23, 11.1), "rot": -34.0, "scale": 0.0075},
+		{"name": "ImportedMushrooms_E", "pos": Vector3(12.2, -0.23, -5.4), "rot": 64.0, "scale": 0.0065},
+	]
+	for placement in mushroom_placements:
 		_spawn_prop_from_root(IMPORTED_MUSHROOM_ROOT, {
-			"name": "ImportedMushrooms_%02d" % index,
+			"name": placement["name"],
 			"asset": "lowpoly_mushrooms.glb",
-			"pos": position + Vector3(0.0, -0.23, 0.0),
-			"rot": rng.randf_range(-180.0, 180.0),
-			"scale": rng.randf_range(0.0048, 0.0092),
+			"pos": placement["pos"],
+			"rot": placement["rot"],
+			"scale": placement["scale"],
 			"preserve_material": true,
 			"cast_shadow": false,
 		}, imported_root)
-
-
-func _get_random_environment_position(rng: RandomNumberGenerator, min_radius: float, max_radius: float) -> Vector3:
-	var angle := rng.randf_range(0.0, TAU)
-	var radius := sqrt(rng.randf_range(min_radius * min_radius, max_radius * max_radius))
-	return Vector3(cos(angle) * radius, 0.0, sin(angle) * radius)
 
 
 func _build_corner_landmarks() -> void:
