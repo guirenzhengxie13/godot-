@@ -210,6 +210,15 @@ func _update_skill_visuals() -> void:
 		"freeze_immune":
 			_mesh_instance.mesh = _create_immune_mesh()
 			_add_immune_visuals()
+		"swift_step":
+			_mesh_instance.mesh = _create_low_dome_mesh()
+			_add_swift_visuals()
+		"vault_jump":
+			_mesh_instance.mesh = _create_tall_bead_mesh()
+			_add_vault_visuals()
+		"guardian_aura":
+			_mesh_instance.mesh = _create_faceted_gem_mesh()
+			_add_guardian_visuals()
 		_:
 			_mesh_instance.mesh = _create_piece_variant_mesh()
 
@@ -350,6 +359,35 @@ func _add_immune_visuals() -> void:
 	guard_instance.position.y = -radius + 0.07
 
 
+func _add_swift_visuals() -> void:
+	for offset in [-0.18, 0.18]:
+		var fin := BoxMesh.new()
+		fin.size = Vector3(radius * 0.72, 0.045, radius * 0.16)
+		var fin_instance := _add_skill_mesh("SwiftFin", fin, _create_glow_material(Color(0.46, 1.0, 0.72, 0.24)))
+		fin_instance.position = Vector3(offset, -radius * 0.72, 0.0)
+
+
+func _add_vault_visuals() -> void:
+	var arc := TorusMesh.new()
+	arc.inner_radius = radius * 0.94
+	arc.outer_radius = radius * 1.08
+	arc.rings = 28
+	arc.ring_segments = 6
+	var arc_instance := _add_skill_mesh("VaultRing", arc, _create_glow_material(Color(0.92, 0.68, 1.0, 0.25)))
+	arc_instance.position.y = radius * 0.26
+	arc_instance.rotation.x = PI * 0.5
+
+
+func _add_guardian_visuals() -> void:
+	var guard := TorusMesh.new()
+	guard.inner_radius = radius * 1.24
+	guard.outer_radius = radius * 1.38
+	guard.rings = 32
+	guard.ring_segments = 6
+	var guard_instance := _add_skill_mesh("GuardianRing", guard, _create_glow_material(Color(0.52, 1.0, 0.62, 0.24)))
+	guard_instance.position.y = -radius + 0.06
+
+
 func _add_skill_mesh(node_name: String, mesh: PrimitiveMesh, material: StandardMaterial3D) -> MeshInstance3D:
 	var mesh_instance := MeshInstance3D.new()
 	mesh_instance.name = node_name
@@ -384,6 +422,15 @@ func _update_status_labels() -> void:
 			"freeze_immune":
 				_skill_label.text = "ICE"
 				_skill_label.modulate = Color(0.7, 0.96, 1.0, 0.72)
+			"swift_step":
+				_skill_label.text = "STEP"
+				_skill_label.modulate = Color(0.52, 1.0, 0.72, 0.68)
+			"vault_jump":
+				_skill_label.text = "VAULT"
+				_skill_label.modulate = Color(0.92, 0.7, 1.0, 0.68)
+			"guardian_aura":
+				_skill_label.text = "GUARD"
+				_skill_label.modulate = Color(0.58, 1.0, 0.66, 0.68)
 			_:
 				_skill_label.text = ""
 	if _lock_label != null:

@@ -9,7 +9,7 @@ signal test_layout_requested
 signal save_camera_view_requested(view_name: String)
 signal create_online_room_requested(signaling_url: String)
 signal join_online_room_requested(room_code: String, signaling_url: String)
-signal local_mode_requested
+signal local_mode_requested(skill_loadout: Dictionary)
 signal ai_takeover_toggled(enabled: bool)
 signal save_match_record_requested
 signal load_match_record_requested
@@ -50,6 +50,7 @@ signal reset_lighting_requested
 @onready var play_again_button: Button = get_node(play_again_button_path) as Button
 
 var _start_menu: Control
+var _skill_loadout_menu: Control
 var _pause_menu: Control
 var _lighting_menu: Control
 var _right_end_turn_button: Button
@@ -100,6 +101,14 @@ var _lighting_sliders: Dictionary = {}
 var _lighting_value_labels: Dictionary = {}
 var _lighting_status_label: Label
 var _lighting_controls_syncing := false
+var _skill_catalog: Array[Dictionary] = []
+var _skill_point_budget := 8
+var _skill_piece_count := 10
+var _skill_option_buttons: Array[OptionButton] = []
+var _skill_points_label: Label
+var _skill_description_label: Label
+var _skill_start_button: Button
+var _skill_loadout_status_label: Label
 
 
 func _ready() -> void:
@@ -107,6 +116,7 @@ func _ready() -> void:
 	_build_hud_controls()
 	_build_replay_controls()
 	_build_start_menu()
+	_build_skill_loadout_menu()
 	_build_pause_menu()
 	_build_lighting_menu()
 	_apply_button_styles(self)
@@ -269,6 +279,13 @@ func set_skill_seed(seed_value: int, enabled: bool) -> void:
 		_seed_input.text = str(seed_value)
 
 
+func set_skill_loadout_options(catalog: Array[Dictionary], point_budget: int, piece_count: int) -> void:
+	_skill_catalog = catalog.duplicate(true)
+	_skill_point_budget = maxi(0, point_budget)
+	_skill_piece_count = maxi(1, piece_count)
+	_populate_skill_loadout_options()
+
+
 func set_analysis_mode(enabled: bool) -> void:
 	if _analysis_button == null:
 		return
@@ -351,6 +368,8 @@ func show_start_menu() -> void:
 	hide_end_turn()
 	if _start_menu != null:
 		_start_menu.visible = true
+	if _skill_loadout_menu != null:
+		_skill_loadout_menu.visible = false
 	if _pause_menu != null:
 		_pause_menu.visible = false
 	if _lighting_menu != null:
@@ -629,7 +648,7 @@ func _build_start_menu() -> void:
 	mode_grid.add_theme_constant_override("h_separation", 12)
 	mode_grid.add_theme_constant_override("v_separation", 12)
 	box.add_child(mode_grid)
-	_build_start_mode_card(mode_grid, "本地 AI 对战", "开始标准对局，随机分配被动技能。", "开始对战", _on_start_local_pressed, Color(0.26, 0.54, 0.42))
+	_build_start_mode_card(mode_grid, "本地 AI 对战", "为己方十枚棋子分配技能点，再开始标准对局。", "配置技能", _on_start_local_pressed, Color(0.26, 0.54, 0.42))
 	_build_start_mode_card(mode_grid, "跳跃训练", "载入测试布局，快速练习连续跳跃。", "进入训练", _on_start_test_layout_pressed, Color(0.54, 0.43, 0.22))
 
 	_start_ai_takeover_checkbox = CheckBox.new()
@@ -676,6 +695,91 @@ func _build_start_menu() -> void:
 	_start_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_start_status_label.add_theme_color_override("font_color", Color(0.7, 0.78, 0.73))
 	box.add_child(_start_status_label)
+
+
+func _build_skill_loadout_menu() -> void:
+	_skill_loadout_menu = _build_overlay_root("SkillLoadoutMenu", 0.68)
+	_skill_loadout_menu.visible = false
+
+	var panel := _build_menu_panel(Vector2(760.0, 660.0))
+	_skill_loadout_menu.add_child(panel)
+	var box := _build_menu_box(panel)
+	box.add_theme_constant_override("separation", 10)
+
+	var title_row := HBoxContainer.new()
+	title_row.add_theme_constant_override("separation", 12)
+	box.add_child(title_row)
+	var title := Label.new()
+	title.text = "开局技能配置"
+	title.add_theme_font_size_override("font_size", 26)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_row.add_child(title)
+	_skill_points_label = Label.new()
+	_skill_points_label.text = "技能点：0 / %d" % _skill_point_budget
+	_skill_points_label.add_theme_font_size_override("font_size", 18)
+	title_row.add_child(_skill_points_label)
+
+	var hint := Label.new()
+	hint.text = "每一行对应己方开局区域中的一枚棋子；棋子编号在每次开局中保持一致。"
+	hint.add_theme_color_override("font_color", Color(0.72, 0.8, 0.75))
+	box.add_child(hint)
+
+	var separator := HSeparator.new()
+	box.add_child(separator)
+
+	var grid := GridContainer.new()
+	grid.name = "SkillPieceGrid"
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 18)
+	grid.add_theme_constant_override("v_separation", 8)
+	grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_child(grid)
+
+	for index in range(_skill_piece_count):
+		var row := HBoxContainer.new()
+		row.custom_minimum_size = Vector2(345.0, 42.0)
+		row.add_theme_constant_override("separation", 8)
+		grid.add_child(row)
+		var piece_label := Label.new()
+		piece_label.text = "棋子 %02d" % (index + 1)
+		piece_label.custom_minimum_size = Vector2(70.0, 0.0)
+		row.add_child(piece_label)
+		var option := OptionButton.new()
+		option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		option.item_selected.connect(_on_skill_option_selected.bind(index))
+		row.add_child(option)
+		_skill_option_buttons.append(option)
+
+	_skill_description_label = Label.new()
+	_skill_description_label.custom_minimum_size = Vector2(0.0, 48.0)
+	_skill_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_skill_description_label.add_theme_color_override("font_color", Color(0.82, 0.88, 0.82))
+	box.add_child(_skill_description_label)
+
+	_skill_loadout_status_label = Label.new()
+	_skill_loadout_status_label.text = "可自由组合，同一种技能可以分配给多枚棋子。"
+	_skill_loadout_status_label.add_theme_color_override("font_color", Color(0.67, 0.76, 0.7))
+	box.add_child(_skill_loadout_status_label)
+
+	var button_row := HBoxContainer.new()
+	button_row.alignment = BoxContainer.ALIGNMENT_END
+	button_row.add_theme_constant_override("separation", 10)
+	box.add_child(button_row)
+	var reset_button := Button.new()
+	reset_button.text = "推荐配置"
+	reset_button.pressed.connect(_apply_recommended_skill_loadout)
+	button_row.add_child(reset_button)
+	var back_button := Button.new()
+	back_button.text = "返回"
+	back_button.pressed.connect(_on_skill_loadout_back_pressed)
+	button_row.add_child(back_button)
+	_skill_start_button = Button.new()
+	_skill_start_button.text = "使用此配置开始"
+	_skill_start_button.set_meta("ui_variant", "primary")
+	_skill_start_button.pressed.connect(_on_skill_loadout_start_pressed)
+	button_row.add_child(_skill_start_button)
+
+	_populate_skill_loadout_options()
 
 
 func _build_pause_menu() -> void:
@@ -1028,6 +1132,82 @@ func _build_overlay_root(node_name: String, shade_alpha := 0.48) -> Control:
 	return root
 
 
+func _populate_skill_loadout_options() -> void:
+	if _skill_catalog.is_empty() or _skill_option_buttons.is_empty():
+		return
+	for option in _skill_option_buttons:
+		option.clear()
+		for skill in _skill_catalog:
+			var cost := int(skill.get("cost", 0))
+			option.add_item("%s  ·  %d 点" % [String(skill.get("short_name", skill.get("name", "技能"))), cost])
+			option.set_item_metadata(option.item_count - 1, String(skill.get("id", "")))
+	_apply_recommended_skill_loadout()
+
+
+func _apply_recommended_skill_loadout() -> void:
+	var recommended := ["immobilize_aura", "dash_jump", "freeze_immune", "swift_step"]
+	for index in range(_skill_option_buttons.size()):
+		_select_skill_option(_skill_option_buttons[index], String(recommended[index]) if index < recommended.size() else "")
+	if _skill_description_label != null:
+		_skill_description_label.text = "推荐配置兼顾控制、跳跃、抗性与移动；展开任意棋子的选项可以改用腾跃或守护光环。"
+	_refresh_skill_loadout_summary()
+
+
+func _select_skill_option(option: OptionButton, skill_id: String) -> void:
+	for index in range(option.item_count):
+		if String(option.get_item_metadata(index)) == skill_id:
+			option.select(index)
+			return
+	if option.item_count > 0:
+		option.select(0)
+
+
+func _on_skill_option_selected(selected_index: int, piece_index: int) -> void:
+	_refresh_skill_loadout_summary()
+	if piece_index < 0 or piece_index >= _skill_option_buttons.size():
+		return
+	var option := _skill_option_buttons[piece_index]
+	if selected_index < 0 or selected_index >= option.item_count:
+		return
+	var skill_id := String(option.get_item_metadata(selected_index))
+	for skill in _skill_catalog:
+		if String(skill.get("id", "")) == skill_id:
+			_skill_description_label.text = "棋子 %02d · %s：%s" % [piece_index + 1, String(skill.get("name", "普通棋子")), String(skill.get("description", ""))]
+			return
+
+
+func _refresh_skill_loadout_summary() -> void:
+	var points_used := 0
+	for skill_id in _collect_skill_loadout():
+		points_used += _get_skill_catalog_cost(String(skill_id))
+	var valid := points_used <= _skill_point_budget
+	if _skill_points_label != null:
+		_skill_points_label.text = "技能点：%d / %d" % [points_used, _skill_point_budget]
+		_skill_points_label.add_theme_color_override("font_color", Color(0.88, 0.95, 0.76) if valid else Color(1.0, 0.46, 0.38))
+	if _skill_start_button != null:
+		_skill_start_button.disabled = not valid
+	if _skill_loadout_status_label != null:
+		_skill_loadout_status_label.text = "配置有效，剩余 %d 点。" % (_skill_point_budget - points_used) if valid else "已超出预算 %d 点，请调整棋子技能。" % (points_used - _skill_point_budget)
+		_skill_loadout_status_label.add_theme_color_override("font_color", Color(0.67, 0.8, 0.7) if valid else Color(1.0, 0.5, 0.42))
+
+
+func _collect_skill_loadout() -> Array:
+	var loadout: Array = []
+	for option in _skill_option_buttons:
+		if option.item_count == 0 or option.selected < 0:
+			loadout.append("")
+		else:
+			loadout.append(String(option.get_item_metadata(option.selected)))
+	return loadout
+
+
+func _get_skill_catalog_cost(skill_id: String) -> int:
+	for skill in _skill_catalog:
+		if String(skill.get("id", "")) == skill_id:
+			return int(skill.get("cost", 0))
+	return 0
+
+
 func _build_menu_panel(min_size: Vector2) -> PanelContainer:
 	var panel := PanelContainer.new()
 	_style_panel(panel)
@@ -1215,8 +1395,32 @@ func _is_material_locked_for_target(target: String, material_id: String) -> bool
 
 
 func _on_start_local_pressed() -> void:
+	if _start_menu != null:
+		_start_menu.visible = false
+	if _skill_loadout_menu != null:
+		_skill_loadout_menu.visible = true
+	_refresh_skill_loadout_summary()
+
+
+func _on_skill_loadout_back_pressed() -> void:
+	if _skill_loadout_menu != null:
+		_skill_loadout_menu.visible = false
+	if _start_menu != null:
+		_start_menu.visible = true
+
+
+func _on_skill_loadout_start_pressed() -> void:
+	var loadout := _collect_skill_loadout()
+	var points_used := 0
+	for skill_id in loadout:
+		points_used += _get_skill_catalog_cost(String(skill_id))
+	if points_used > _skill_point_budget:
+		_refresh_skill_loadout_summary()
+		return
+	if _skill_loadout_menu != null:
+		_skill_loadout_menu.visible = false
 	hide_start_menu()
-	local_mode_requested.emit()
+	local_mode_requested.emit({1: loadout})
 
 
 func _on_start_test_layout_pressed() -> void:
@@ -1256,13 +1460,13 @@ func _on_pause_restart_pressed() -> void:
 func _on_main_menu_pressed() -> void:
 	if _pause_menu != null:
 		_pause_menu.visible = false
-	local_mode_requested.emit()
+	local_mode_requested.emit({})
 	show_start_menu()
 
 
 func _on_pause_local_mode_pressed() -> void:
 	_on_resume_pressed()
-	local_mode_requested.emit()
+	local_mode_requested.emit({})
 
 
 func _on_restart_pressed() -> void:

@@ -57,6 +57,7 @@ var _turn_move_count := 0
 var _turn_move_kind := ""
 var _skills_enabled := true
 var _match_seed := 0
+var _player_skill_loadouts: Dictionary = {}
 var _analysis_mode := false
 var _inspected_piece
 
@@ -91,6 +92,12 @@ func _ready() -> void:
 	game_ui.lighting_value_changed.connect(_on_lighting_value_changed)
 	game_ui.save_lighting_requested.connect(_on_save_lighting_requested)
 	game_ui.reset_lighting_requested.connect(_on_reset_lighting_requested)
+	game_ui.call_deferred(
+		"set_skill_loadout_options",
+		skill_rules.get_skill_catalog(),
+		skill_rules.get_skill_point_budget(),
+		board_manager.get_player_piece_count(human_player_id)
+	)
 	game_ui.set_material_options(board_manager.get_material_options())
 	game_ui.set_material_selection(board_manager.get_material_selection())
 	if background_manager != null:
@@ -546,9 +553,11 @@ func _on_join_online_room_requested(room_code: String, signaling_url: String) ->
 	network_manager.join_room(room_code)
 
 
-func _on_local_mode_requested() -> void:
+func _on_local_mode_requested(skill_loadout: Dictionary) -> void:
 	if network_manager != null:
 		network_manager.leave_online_session()
+	if not skill_loadout.is_empty():
+		_player_skill_loadouts = skill_loadout.duplicate(true)
 	game_mode = MODE_LOCAL_VS_AI
 	local_player_id = human_player_id
 	online_is_host = false
@@ -990,7 +999,7 @@ func _reset_match_state(seed_override = null) -> void:
 	_set_skills_enabled(not _is_online_mode())
 	if _skills_enabled:
 		_match_seed = int(seed_override) if seed_override != null else _generate_match_seed()
-		board_manager.assign_random_passive_skills(_match_seed)
+		board_manager.assign_passive_skill_loadouts(_match_seed, skill_rules, _player_skill_loadouts)
 	else:
 		_match_seed = 0
 		board_manager.clear_passive_skills()
@@ -1322,6 +1331,8 @@ func _serialize_action_effects(effects: Array) -> Array:
 			entry["from"] = _coord_to_array(entry["from"])
 		if entry.get("to") is Vector2i:
 			entry["to"] = _coord_to_array(entry["to"])
+		if entry.get("crossed") is Vector2i:
+			entry["crossed"] = _coord_to_array(entry["crossed"])
 		if entry.get("jumped") is Array:
 			var jumped_coords: Array = []
 			for coord in entry["jumped"]:
@@ -1341,6 +1352,8 @@ func _deserialize_action_effects(effects: Array) -> Array:
 			entry["from"] = _array_to_coord(entry["from"])
 		if entry.get("to") is Array:
 			entry["to"] = _array_to_coord(entry["to"])
+		if entry.get("crossed") is Array:
+			entry["crossed"] = _array_to_coord(entry["crossed"])
 		if entry.get("jumped") is Array:
 			var jumped_coords: Array = []
 			for coord in entry["jumped"]:

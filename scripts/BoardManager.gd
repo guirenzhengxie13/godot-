@@ -343,6 +343,28 @@ func highlight_skill_aura(coords: Array[Vector2i]) -> void:
 			cell.set_aura_target(true)
 
 
+func assign_passive_skill_loadouts(seed_value: int, skill_rules, player_loadouts := {}) -> Dictionary:
+	_skill_seed = seed_value
+	for piece in pieces.values():
+		piece.set_passive_skill("")
+
+	var applied_loadouts: Dictionary = {}
+	for player_id in player_starts.keys():
+		var player_pieces := get_player_pieces(player_id)
+		if player_pieces.is_empty():
+			continue
+		player_pieces.sort_custom(func(a, b) -> bool: return String(a.piece_id) < String(b.piece_id))
+		var requested_loadout: Array = player_loadouts.get(player_id, player_loadouts.get(str(player_id), []))
+		var validation: Dictionary = skill_rules.validate_loadout(requested_loadout, player_pieces.size()) if not requested_loadout.is_empty() else {}
+		var loadout: Array = validation.get("skills", []) if bool(validation.get("valid", false)) else []
+		if loadout.is_empty():
+			loadout = _build_seeded_skill_loadout(skill_rules, player_pieces.size(), seed_value + int(player_id) * 1009)
+		for index in range(player_pieces.size()):
+			player_pieces[index].set_passive_skill(String(loadout[index]) if index < loadout.size() else "")
+		applied_loadouts[player_id] = loadout.duplicate()
+	return applied_loadouts
+
+
 func assign_random_passive_skills(seed_value: int) -> void:
 	_skill_seed = seed_value
 	for piece in pieces.values():
@@ -363,6 +385,44 @@ func assign_random_passive_skills(seed_value: int) -> void:
 		player_pieces[0].set_passive_skill("immobilize_aura")
 		player_pieces[1].set_passive_skill("dash_jump")
 		player_pieces[2].set_passive_skill("freeze_immune")
+
+
+func _build_seeded_skill_loadout(skill_rules, piece_count: int, seed_value: int) -> Array:
+	var loadout: Array = []
+	loadout.resize(piece_count)
+	loadout.fill("")
+	var catalog: Array[Dictionary] = skill_rules.get_skill_catalog()
+	var available: Array[Dictionary] = []
+	for skill in catalog:
+		if int(skill.get("cost", 0)) > 0:
+			available.append(skill)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value
+	var piece_indices := range(piece_count)
+	for index in range(piece_indices.size() - 1, 0, -1):
+		var swap_index := rng.randi_range(0, index)
+		var swap_value = piece_indices[index]
+		piece_indices[index] = piece_indices[swap_index]
+		piece_indices[swap_index] = swap_value
+	var remaining_points: int = skill_rules.get_skill_point_budget()
+	var usage: Dictionary = {}
+	var slot_index := 0
+	while slot_index < piece_indices.size():
+		var candidates: Array[Dictionary] = []
+		for skill in available:
+			var skill_id := String(skill.get("id", ""))
+			var cost := int(skill.get("cost", 0))
+			if cost <= remaining_points and int(usage.get(skill_id, 0)) < 2:
+				candidates.append(skill)
+		if candidates.is_empty():
+			break
+		var selected: Dictionary = candidates[rng.randi_range(0, candidates.size() - 1)]
+		var selected_id := String(selected.get("id", ""))
+		loadout[piece_indices[slot_index]] = selected_id
+		remaining_points -= int(selected.get("cost", 0))
+		usage[selected_id] = int(usage.get(selected_id, 0)) + 1
+		slot_index += 1
+	return loadout
 
 
 func clear_passive_skills() -> void:
